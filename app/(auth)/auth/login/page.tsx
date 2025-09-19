@@ -1,49 +1,118 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Users } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { Role } from "@/types"
-import { useToast } from "@/hooks/use-toast"
+import { Loader2 } from "lucide-react"
 import Image from "next/image"
+import { fetchData } from "@/lib/api"
+import Swal from "sweetalert2"
+
+type Role = "ADMIN" | "PEMINJAM"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<Role | "">("")
   const [error, setError] = useState("")
-  const { login, isLoading } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
+
+  const resolveRole = async (loginResp: any, token?: string): Promise<Role | null> => {
+    // 1) Coba dari respons login langsung
+    const roleFromLogin: Role | undefined =
+      loginResp?.user?.role || loginResp?.role || loginResp?.data?.user?.role
+    if (roleFromLogin === "ADMIN" || roleFromLogin === "PEMINJAM") return roleFromLogin
+
+    // 2) Fallback: panggil /auth/me pakai token baru
+    try {
+      if (!token) return null
+      const me = await fetchData("/auth/me", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const roleFromMe: Role | undefined =
+        me?.role || me?.user?.role || me?.data?.role || me?.data?.user?.role
+      if (roleFromMe === "ADMIN" || roleFromMe === "PEMINJAM") return roleFromMe
+      return null
+    } catch {
+      return null
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setIsLoading(true)
 
-    if (!email || !password || !role) {
-      setError("Semua field harus diisi")
+    if (!email || !password) {
+      setIsLoading(false)
+      setError("Email dan password wajib diisi")
+      await Swal.fire({
+        icon: "warning",
+        title: "Input belum lengkap",
+        text: "Email dan password wajib diisi.",
+      })
       return
     }
 
-    const success = await login(email, password, role as Role)
-
-    if (success) {
-      toast({
-        title: "Login berhasil",
-        description: "Selamat datang di UMC Media Hub",
+    try {
+      const response = await fetchData("/auth/login", {
+        method: "POST",
+        data: { email, password },
       })
-      router.push("/dashboard")
-    } else {
-      setError("Email, password, atau role tidak valid")
+
+      // Simpan token jika ada
+      if (response?.token) {
+        localStorage.setItem("token", response.token)
+      }
+
+      // Tentukan role (dari respons login atau fallback /auth/me)
+      const role = await resolveRole(response, response?.token)
+
+      if (role) {
+        localStorage.setItem("role", role)
+      }
+
+      await Swal.fire({
+        icon: "success",
+        title: "Login berhasil",
+        text: "Selamat datang di UMC Media Hub 👋",
+        timer: 1200,
+        showConfirmButton: false,
+      })
+
+      // Redirect sesuai role
+      if (role === "PEMINJAM") {
+        router.push("/home")
+      } else if (role === "ADMIN") {
+        router.push("/dashboard")
+      } else {
+        // fallback kalau role nggak ketemu: arahkan ke login lagi + info
+        await Swal.fire({
+          icon: "info",
+          title: "Perlu hak akses",
+          text: "Role tidak terdeteksi. Silakan coba lagi atau hubungi admin.",
+        })
+      }
+    } catch (err: any) {
+      const errorMessage =
+        err?.response?.data?.message || err?.message || "Email atau password salah"
+
+      setError(errorMessage)
+
+      await Swal.fire({
+        icon: "error",
+        title: "Login gagal",
+        text: errorMessage,
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -64,9 +133,12 @@ export default function LoginPage() {
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
               UMC Media Hub
             </CardTitle>
-            <CardDescription className="text-base mt-2">Sistem Peminjaman Aset & Jasa Multimedia</CardDescription>
+            <CardDescription className="text-base mt-2">
+              Sistem Peminjaman Aset & Jasa Multimedia
+            </CardDescription>
           </div>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -99,31 +171,6 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role" className="text-sm font-medium">
-                Role (Demo)
-              </Label>
-              <Select value={role} onValueChange={(value) => setRole(value as Role)}>
-                <SelectTrigger className="h-12 rounded-xl border-2 focus:border-indigo-500">
-                  <SelectValue placeholder="Pilih role untuk demo" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value={Role.ADMIN} className="rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      Admin
-                    </div>
-                  </SelectItem>
-                  <SelectItem value={Role.PEMINJAM} className="rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Image src="/logo.png" alt="Peminjam" width={16} height={16} className="rounded-sm" />
-                      Peminjam
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {error && (
               <Alert className="rounded-xl border-red-200 bg-red-50">
                 <AlertDescription className="text-red-800">{error}</AlertDescription>
@@ -148,19 +195,17 @@ export default function LoginPage() {
                 <span className="!text-white font-medium">Masuk</span>
               )}
             </Button>
-          </form>
 
-          <div className="mt-8 p-4 bg-gray-50 rounded-xl">
-            <p className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</p>
-            <div className="space-y-1 text-xs text-gray-600">
-              <p>
-                <strong>Admin:</strong> admin@umc.ac.id (password: admin123)
-              </p>
-              <p>
-                <strong>Peminjam:</strong> budi@student.umc.ac.id (password: budi123)
-              </p>
-            </div>
-          </div>
+            <p className="text-center text-sm text-muted-foreground">
+              Belum punya akun?{" "}
+              <Link
+                href="/auth/register"
+                className="font-medium text-indigo-600 hover:text-indigo-700 underline-offset-4 hover:underline"
+              >
+                Daftar di sini
+              </Link>
+            </p>
+          </form>
         </CardContent>
       </Card>
     </div>
