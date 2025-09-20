@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,45 +20,197 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/contexts/auth-context";
-import { mockBookings, mockBookingItems, mockUsers } from "@/lib/mock";
-import { BookingStatus, Role } from "@/types";
+import { Role } from "@/types";
 import { formatCurrency, formatDateTime } from "@/lib/format";
-import { Plus, Eye, Trash2, Calendar, Edit } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import {
+  Eye,
+  CheckCircle,
+  XCircle,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+} from "lucide-react";
+import { fetchData } from "@/lib/api";
+import Swal from "sweetalert2";
+
+// Pagination component (diambil dari kode inventory)
+function Pagination({
+  total,
+  page,
+  setPage,
+  pageSize,
+  setPageSize,
+}: {
+  total: number;
+  page: number;
+  setPage: (n: number | ((p: number) => number)) => void;
+  pageSize: number;
+  setPageSize: (n: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pageWindow = (cur: number, tot: number, span = 2) => {
+    const out: (number | string)[] = [];
+    const s = Math.max(1, cur - span);
+    const e = Math.min(tot, cur + span);
+    if (s > 1) out.push(1);
+    if (s > 2) out.push("...");
+    for (let p = s; p <= e; p++) out.push(p);
+    if (e < tot - 1) out.push("...");
+    if (e < tot) out.push(tot);
+    return out;
+  };
+  const pagesArr = useMemo(
+    () => pageWindow(page, totalPages, 2),
+    [page, totalPages]
+  );
+
+  return (
+    <div className="flex items-center justify-between px-1 py-2">
+      <div className="text-sm text-gray-600">
+        Menampilkan{" "}
+        <span className="font-medium">
+          {total === 0 ? 0 : (page - 1) * pageSize + 1}
+        </span>{" "}
+        –
+        <span className="font-medium"> {Math.min(page * pageSize, total)}</span>{" "}
+        dari <span className="font-medium">{total}</span> data
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">Rows</span>
+          <select
+            className="h-9 rounded-xl border px-3 text-sm"
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+          >
+            {[5, 10, 20, 50].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            size="sm"
+            onClick={() => setPage(1)}
+            disabled={page <= 1}
+          >
+            <ChevronsLeft className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          {pagesArr.map((p, i) =>
+            typeof p === "string" ? (
+              <span key={`${p}-${i}`} className="px-2 text-sm text-gray-500">
+                {p}
+              </span>
+            ) : (
+              <Button
+                key={p}
+                variant={p === page ? "default" : "outline"}
+                size="sm"
+                className={
+                  p === page ? "rounded-xl bg-indigo-600" : "rounded-xl"
+                }
+                onClick={() => setPage(p)}
+              >
+                {p}
+              </Button>
+            )
+          )}
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            size="sm"
+            onClick={() => setPage(totalPages)}
+            disabled={page >= totalPages}
+          >
+            <ChevronsRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function BookingsPage() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState("");
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [bookingToDelete, setBookingToDelete] = useState<{
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [bookingToAction, setBookingToAction] = useState<{
     id: string;
     userName: string;
   } | null>(null);
 
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Detail dialog state
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailData, setDetailData] = useState<any | null>(null);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const isAdmin = user?.role === Role.ADMIN;
 
-  // Get bookings with user and item details
-  const bookingsWithDetails = mockBookings
-    .filter((booking) => (isAdmin ? true : booking.userId === user?.id))
-    .map((booking) => {
-      const bookingUser = mockUsers.find((u) => u.id === booking.userId);
-      const items = mockBookingItems.filter(
-        (item) => item.bookingId === booking.id
-      );
-      const totalAmount = items.reduce((sum, item) => sum + item.price, 0);
+  // Fetch bookings
+  useEffect(() => {
+    async function loadBookings() {
+      setLoading(true);
+      try {
+        const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
+        const data = await fetchData<{ bookings: any[] }>(endpoint, {
+          method: "GET",
+        });
+        setBookings(data?.bookings || []);
+      } catch (e: any) {
+        const msg = e?.response?.data?.message || "Gagal memuat data booking";
+        Swal.fire({ icon: "error", title: "Error", text: msg });
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadBookings();
+  }, [isAdmin]);
 
-      return {
-        ...booking,
-        userName: bookingUser?.name || "Unknown",
-        userEmail: bookingUser?.email || "",
-        itemCount: items.length,
-        totalAmount,
-      };
-    })
+  const filteredBookings = bookings
     .filter(
       (booking) =>
         !statusFilter ||
@@ -70,6 +222,36 @@ export default function BookingsPage() {
         new Date(b.startDatetime).getTime() -
         new Date(a.startDatetime).getTime()
     );
+
+  // Paginate data
+  const pagedBookings = useMemo(
+    () => filteredBookings.slice((page - 1) * pageSize, page * pageSize),
+    [filteredBookings, page, pageSize]
+  );
+
+  // Helpers
+  const computeTotal = (items: any[] = []) =>
+    items.reduce((sum, it) => {
+      const qty = Number(it?.qty || 0);
+      const price = Number(it?.price || 0);
+      return sum + qty * price;
+    }, 0);
+
+  const openDetail = async (id: string) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailData(null);
+    try {
+      const data = await fetchData<any>(`/bookings/${id}`, { method: "GET" });
+      setDetailData(data);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Gagal memuat detail booking";
+      Swal.fire({ icon: "error", title: "Error", text: msg });
+      setDetailOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   // Define columns for bookings table
   const bookingColumns = [
@@ -85,12 +267,12 @@ export default function BookingsPage() {
     ...(isAdmin
       ? [
           {
-            key: "userName",
+            key: "user",
             title: "Peminjam",
-            render: (value: string, item: any) => (
+            render: (value: any) => (
               <div>
-                <p className="font-medium">{value}</p>
-                <p className="text-sm text-gray-500">{item.userEmail}</p>
+                <p className="font-medium">{value?.name || "Unknown"}</p>
+                <p className="text-sm text-gray-500">{value?.email || ""}</p>
               </div>
             ),
           },
@@ -108,14 +290,15 @@ export default function BookingsPage() {
       render: (value: string) => formatDateTime(value),
     },
     {
-      key: "itemCount",
+      key: "items",
       title: "Jumlah Item",
-      render: (value: number) => `${value} item`,
+      render: (value: any[]) => `${value.length} item`,
     },
     {
       key: "totalAmount",
       title: "Total",
-      render: (value: number) => formatCurrency(value),
+      render: (value: number, row: any) =>
+        formatCurrency(value ?? computeTotal(row?.items || [])),
     },
     {
       key: "status",
@@ -127,55 +310,121 @@ export default function BookingsPage() {
       title: "Aksi",
       render: (_: any, booking: any) => (
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <Link href={`/bookings/${booking.id}`}>
-              <Eye className="w-4 h-4" />
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <Link href={`/bookings/${booking.id}/edit`}>
-              <Edit className="w-4 h-4" />
-            </Link>
+          {/* GANTI: buka pop-up detail, bukan pindah halaman */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-lg"
+            onClick={() => openDetail(booking.id)}
+          >
+            <Eye className="w-4 h-4" />
           </Button>
 
-          {(isAdmin ||
-            (booking.status === BookingStatus.MENUNGGU &&
-              booking.userId === user?.id)) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setBookingToDelete({
-                  id: booking.id,
-                  userName: booking.userName,
-                });
-                setDeleteDialogOpen(true);
-              }}
-              className="rounded-lg text-red-600 hover:text-red-700"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+          {isAdmin && booking.status === "MENUNGGU" && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setBookingToAction({
+                    id: booking.id,
+                    userName: booking.user?.name || "Unknown",
+                  });
+                  setApproveDialogOpen(true);
+                }}
+                className="rounded-lg text-green-600 hover:text-green-700"
+              >
+                <CheckCircle className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setBookingToAction({
+                    id: booking.id,
+                    userName: booking.user?.name || "Unknown",
+                  });
+                  setRejectDialogOpen(true);
+                }}
+                className="rounded-lg text-red-600 hover:text-red-700"
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
+            </>
           )}
         </div>
       ),
     },
   ];
 
-  const handleDelete = () => {
-    if (bookingToDelete) {
-      // In a real app, this would make an API call
-      console.log("Deleting booking:", bookingToDelete.id);
-      toast({
-        title: "Berhasil",
-        description: `Booking berhasil dihapus`,
-      });
-      setBookingToDelete(null);
-      setDeleteDialogOpen(false);
+  const handleApprove = async () => {
+    if (bookingToAction) {
+      try {
+        await fetchData(`/bookings/${bookingToAction.id}/approve`, {
+          method: "PATCH",
+        });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: "Booking berhasil disetujui",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        // Refresh bookings
+        const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
+        const data = await fetchData<{ bookings: any[] }>(endpoint, {
+          method: "GET",
+        });
+        setBookings(data?.bookings || []);
+      } catch (e: any) {
+        const msg = e?.response?.data?.message || "Gagal menyetujui booking";
+        Swal.fire({ icon: "error", title: "Error", text: msg });
+      } finally {
+        setBookingToAction(null);
+        setApproveDialogOpen(false);
+      }
     }
   };
 
+  const handleReject = async () => {
+    if (bookingToAction) {
+      try {
+        await fetchData(`/bookings/${bookingToAction.id}/reject`, {
+          method: "PATCH",
+        });
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: "Booking berhasil ditolak",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        // Refresh bookings
+        const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
+        const data = await fetchData<{ bookings: any[] }>(endpoint, {
+          method: "GET",
+        });
+        setBookings(data?.bookings || []);
+      } catch (e: any) {
+        const msg = e?.response?.data?.message || "Gagal menolak booking";
+        Swal.fire({ icon: "error", title: "Error", text: msg });
+      } finally {
+        setBookingToAction(null);
+        setRejectDialogOpen(false);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 md:-ml-24">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -188,20 +437,9 @@ export default function BookingsPage() {
               : "Lihat dan kelola booking Anda"}
           </p>
         </div>
-        <Button
-          asChild
-          className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
-        >
-          <Link href="/bookings/new">
-            <Plus className="w-4 h-4 mr-2" />
-            Buat Pemesanan Baru
-          </Link>
-        </Button>
       </div>
-
       {/* Filters */}
       <div className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border">
-        <Calendar className="w-5 h-5 text-gray-400" />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-48 rounded-xl">
             <SelectValue placeholder="Semua Status" />
@@ -210,60 +448,236 @@ export default function BookingsPage() {
             <SelectItem value="all" className="rounded-lg">
               Semua Status
             </SelectItem>
-            <SelectItem value={BookingStatus.MENUNGGU} className="rounded-lg">
+            <SelectItem value="MENUNGGU" className="rounded-lg">
               Menunggu
             </SelectItem>
-            <SelectItem
-              value={BookingStatus.DIKONFIRMASI}
-              className="rounded-lg"
-            >
-              Dikonfirmasi
+            <SelectItem value="DIKONFIRMASI" className="rounded-lg">
+              Dikonformasi
             </SelectItem>
-            <SelectItem value={BookingStatus.DITOLAK} className="rounded-lg">
+            <SelectItem value="DITOLAK" className="rounded-lg">
               Ditolak
             </SelectItem>
-            <SelectItem value={BookingStatus.DIBATALKAN} className="rounded-lg">
+            <SelectItem value="DIBATALKAN" className="rounded-lg">
               Dibatalkan
             </SelectItem>
-            <SelectItem value={BookingStatus.SELESAI} className="rounded-lg">
+            <SelectItem value="SELESAI" className="rounded-lg">
               Selesai
             </SelectItem>
           </SelectContent>
         </Select>
         <div className="text-sm text-gray-500">
-          Menampilkan {bookingsWithDetails.length} pemesanan
+          Menampilkan {filteredBookings.length} pemesanan
         </div>
       </div>
-
       {/* Bookings Table */}
       <DataTable
-        data={bookingsWithDetails}
+        data={pagedBookings}
         columns={bookingColumns}
         searchPlaceholder="Cari booking..."
-        pageSize={10}
+        searchable={true}
       />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* Pagination */}
+      <Pagination
+        total={filteredBookings.length}
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+      />
+      {/* Approve Confirmation Dialog */}
+      <AlertDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Konfirmasi Hapus Booking</AlertDialogTitle>
+            <AlertDialogTitle>Konfirmasi Setujui Booking</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus booking ini? Tindakan ini tidak
-              dapat dibatalkan.
+              Apakah Anda yakin ingin menyetujui booking dari{" "}
+              {bookingToAction?.userName}?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
-              className="rounded-xl bg-red-600 hover:bg-red-700"
+              onClick={handleApprove}
+              className="rounded-xl bg-green-600 hover:bg-green-700"
             >
-              Hapus
+              Setujui
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Reject Confirmation Dialog */}
+      <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Tolak Booking</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menolak booking dari{" "}
+              {bookingToAction?.userName}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleReject}
+              className="rounded-xl bg-red-600 hover:bg-red-700"
+            >
+              Tolak
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* DETAIL BOOKING DIALOG */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="rounded-2xl max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detail Booking</DialogTitle>
+            <DialogDescription>Informasi lengkap pemesanan</DialogDescription>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="py-10 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
+            </div>
+          ) : detailData ? (
+            <div className="space-y-5">
+              {/* Header ringkas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border bg-gray-50">
+                  <div className="text-xs text-gray-500">ID Booking</div>
+                  <div className="font-mono text-sm break-all">
+                    {detailData.id}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border bg-gray-50">
+                  <div className="text-xs text-gray-500">Status</div>
+                  <div className="mt-1">
+                    <StatusBadge status={detailData.status} />
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <div className="p-4 rounded-xl border bg-gray-50 md:col-span-2">
+                    <div className="text-xs text-gray-500">Peminjam</div>
+                    <div className="mt-1">
+                      <div className="font-medium break-words">
+                        {detailData.user?.name ?? "Unknown"}
+                      </div>
+                      <div className="text-sm text-gray-600 break-all">
+                        {detailData.user?.email ?? ""}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-4 rounded-xl border bg-gray-50">
+                  <div className="text-xs text-gray-500">Tanggal Mulai</div>
+                  <div className="mt-1 font-medium break-words">
+                    {formatDateTime(detailData.startDatetime)}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border bg-gray-50">
+                  <div className="text-xs text-gray-500">Tanggal Selesai</div>
+                  <div className="mt-1 font-medium break-words">
+                    {formatDateTime(detailData.endDatetime)}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border bg-gray-50">
+                  <div className="text-xs text-gray-500">Tipe</div>
+                  <div className="mt-1 font-medium break-words">
+                    {detailData.type}
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border bg-gray-50 md:col-span-2">
+                  <div className="text-xs text-gray-500">Catatan</div>
+                  <div className="mt-1 break-words whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    {detailData.notes || "-"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="rounded-2xl border overflow-hidden">
+                <div className="px-4 py-3 bg-gray-100 font-semibold">
+                  Item ({detailData.items?.length ?? 0})
+                </div>
+                <div className="divide-y max-h-72 overflow-auto">
+                  {(detailData.items ?? []).map((it: any) => {
+                    const isService = it.itemType === "JASA";
+                    const name = isService ? it.service?.name : it.asset?.name;
+                    const code = isService ? it.service?.code : it.asset?.code;
+                    return (
+                      <div
+                        key={it.id}
+                        className="px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium break-words">
+                            {name ?? (isService ? "Jasa" : "Aset")}
+                          </div>
+                          <div className="text-xs text-gray-500 break-all">
+                            {code ? `Kode: ${code}` : ""}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Tipe: {it.itemType}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 sm:gap-8 w-full sm:w-auto justify-between sm:justify-end">
+                          <div className="text-sm text-gray-600">
+                            Qty: {it.qty}
+                          </div>
+                          <div className="text-sm">
+                            {formatCurrency(Number(it.price || 0))}
+                          </div>
+                          <div className="font-semibold whitespace-nowrap">
+                            {formatCurrency(
+                              Number(it.qty || 0) * Number(it.price || 0)
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="px-4 py-3 flex items-center justify-end gap-6 bg-white border-t">
+                  <div className="text-sm text-gray-600">Total</div>
+                  <div className="text-xl font-bold">
+                    {formatCurrency(
+                      detailData.totalAmount ?? computeTotal(detailData.items)
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Seksi tambahan ringkas */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl border">
+                  <div className="text-xs text-gray-500">Pembayaran</div>
+                  <div className="mt-1 font-semibold">
+                    {detailData.payments?.length ?? 0} record
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border">
+                  <div className="text-xs text-gray-500">Denda</div>
+                  <div className="mt-1 font-semibold">
+                    {detailData.fines?.length ?? 0} record
+                  </div>
+                </div>
+                <div className="p-4 rounded-xl border">
+                  <div className="text-xs text-gray-500">Feedback</div>
+                  <div className="mt-1 font-semibold">
+                    {detailData.feedbacks?.length ?? 0} record
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-600">
+              Data tidak tersedia
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
