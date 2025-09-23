@@ -65,6 +65,7 @@
     "vaul": "^0.9.9",
     "vue": "latest",
     "vue-router": "latest",
+    "xendit-node": "^7.0.0",
     "zod": "3.25.67"
   },
   "devDependencies": {
