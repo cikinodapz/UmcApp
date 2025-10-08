@@ -129,7 +129,7 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
     return (
       <div className="flex items-center gap-2 text-gray-600">
         <Loader2 className="w-4 h-4 animate-spin" />
-        Memuat detail jasa...
+        Memuat detail jasa…
       </div>
     )
   }
@@ -202,8 +202,8 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
                   min={1}
                   value={qty}
                   onChange={(e) => setQty(Math.max(1, Number(e.target.value || 1)))}
-                  className="rounded-xl h-12 mt-1"
-                    Menambahkan...
+                  className="rounded-xl mt-1"
+                />
               </div>
 
               <Button
@@ -219,7 +219,7 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
                 {submitting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Menambahkan...
+                    Menambahkan…
                   </>
                 ) : (
                   <>
@@ -250,7 +250,7 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-                  Menambahkan...
+            <AlertDialogCancel className="rounded-xl" disabled={submitting}>
               Batal
             </AlertDialogCancel>
             <AlertDialogAction
@@ -266,7 +266,7 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Menambahkan...
+                  Menambahkan…
                 </>
               ) : (
                 "Ya, Tambahkan"

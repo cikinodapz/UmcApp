@@ -132,7 +132,7 @@ export default function AssetDetailPage({ params }: { params: Params }) {
     return (
       <div className="flex items-center gap-2 text-gray-600">
         <Loader2 className="w-4 h-4 animate-spin" />
-        Memuat detail aset...
+        Memuat detail aset…
       </div>
     )
   }
@@ -245,7 +245,7 @@ export default function AssetDetailPage({ params }: { params: Params }) {
                 {submitting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Menambahkan...
+                    Menambahkan…
                   </>
                 ) : (
                   <>
@@ -271,10 +271,10 @@ export default function AssetDetailPage({ params }: { params: Params }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Tambah ke Keranjang?</AlertDialogTitle>
             <AlertDialogDescription>
-            <AlertDialogDescription>
               Kamu akan menambahkan <span className="font-medium">{data.name}</span> sebanyak{" "}
               <span className="font-medium">{qty} item</span> ke keranjang.
             </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl" disabled={submitting}>
               Batal
@@ -292,7 +292,7 @@ export default function AssetDetailPage({ params }: { params: Params }) {
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Menambahkan...
+                  Menambahkan…
                 </>
               ) : (
                 "Ya, Tambahkan"

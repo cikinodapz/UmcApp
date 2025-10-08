@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -86,19 +87,43 @@ export default function BookingListPage() {
 
   // cancel booking
   async function cancelBooking(bookingId: string) {
+    const result = await Swal.fire({
+      title: "Batalkan booking?",
+      text: "Tindakan ini tidak dapat dibatalkan.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya, batalkan",
+      cancelButtonText: "Tidak",
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      reverseButtons: true,
+      focusCancel: true,
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
       setBookingsBusy(`cancel-${bookingId}`);
       const data = await fetchData(`/bookings/${bookingId}/cancel`, {
         method: "PATCH",
       });
-      toast({
-        title: "Sukses",
-        description: data.message || "Booking berhasil dibatalkan.",
+
+      await Swal.fire({
+        title: "Dibatalkan",
+        text: data.message || "Booking berhasil dibatalkan.",
+        icon: "success",
+        confirmButtonColor: "#16a34a",
       });
+
       await fetchBookings();
     } catch (e: any) {
       const msg = e?.response?.data?.message || "Gagal membatalkan booking";
-      toast({ title: "Error", description: msg, variant: "destructive" });
+      await Swal.fire({
+        title: "Gagal",
+        text: msg,
+        icon: "error",
+        confirmButtonColor: "#ef4444",
+      });
     } finally {
       setBookingsBusy(null);
     }
@@ -285,18 +310,20 @@ export default function BookingListPage() {
 
                       {isPending && (
                         <Button
-                          variant="destructive"
-                          className="w-full rounded-lg"
+                          className="w-full h-12 rounded-xl !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0 disabled:opacity-80 disabled:cursor-not-allowed"
                           onClick={() => cancelBooking(b.id)}
                           disabled={isBusy}
-                          size="sm"
+                          style={{
+                            background: "linear-gradient(to right, rgb(248, 113, 113), rgb(220, 38, 38))",
+                            color: "white",
+                          }}
                         >
                           {isBusy ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin !text-white" />
                           ) : (
-                            <XCircle className="w-4 h-4 mr-2" />
+                            <XCircle className="mr-2 h-4 w-4 !text-white" />
                           )}
-                          Batalkan Booking
+                          <span className="font-medium !text-white">Batalkan Booking</span>
                         </Button>
                       )}
 
@@ -313,18 +340,20 @@ export default function BookingListPage() {
                             </p>
                           </div>
                           <Button
-                            variant="default"
-                            className="w-full rounded-lg"
+                            className="w-full h-12 rounded-xl !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0 disabled:opacity-80 disabled:cursor-not-allowed"
                             onClick={() => createPayment(b.id)}
                             disabled={isBusy}
-                            size="sm"
+                            style={{
+                              background: "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                              color: "white",
+                            }}
                           >
                             {isBusy ? (
-                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin !text-white" />
                             ) : (
-                              <CreditCard className="w-4 h-4 mr-2" />
+                              <CreditCard className="mr-2 h-4 w-4 !text-white" />
                             )}
-                            Bayar Sekarang
+                            <span className="font-medium !text-white">Bayar Sekarang</span>
                           </Button>
                         </>
                       )}
