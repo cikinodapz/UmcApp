@@ -181,19 +181,39 @@ export default function AssetDetailPage({ params }: { params: Params }) {
               </Badge>
             </div>
 
-            <div className="mt-5 space-y-2 text-sm text-gray-700">
-              <p>
-                <span className="text-gray-500">Spesifikasi:</span> {data.specification || "-"}
-              </p>
-              <p>
-                <span className="text-gray-500">Tarif harian:</span>{" "}
-                <span className="font-semibold">{formatCurrency(Number(data.dailyRate || 0))}</span>
-              </p>
-              {data.acquisitionDate && (
-                <p>
-                  <span className="text-gray-500">Tgl perolehan:</span>{" "}
-                  {new Date(data.acquisitionDate).toLocaleDateString()}
-                </p>
+            <div className="mt-5 space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 text-indigo-700 px-3 py-1 font-semibold">
+                {formatCurrency(Number(data.dailyRate || 0))} / hari
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="text-gray-500">Status</span>
+                  <span className="font-medium">{data.status}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="text-gray-500">Stok</span>
+                  <span className="font-medium">{data.stock}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="text-gray-500">Kondisi</span>
+                  <span className="font-medium">{data.conditionNow}</span>
+                </div>
+                {data.acquisitionDate && (
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <span className="text-gray-500">Tgl perolehan</span>
+                    <span className="font-medium">{new Date(data.acquisitionDate).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
+
+              {data.specification && (
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-1">Spesifikasi</p>
+                  <div className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                    {data.specification}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -208,12 +228,17 @@ export default function AssetDetailPage({ params }: { params: Params }) {
                   onChange={(e) =>
                     setQty(Math.max(1, Math.min(Number(e.target.value || 1), Math.max(1, data.stock))))
                   }
-                  className="rounded-xl mt-1"
+                  className="rounded-xl h-12 mt-1"
                 />
               </div>
 
               <Button
-                className="rounded-xl"
+                className="rounded-xl !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+                style={{
+                  background:
+                    "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                  color: "white",
+                }}
                 onClick={onClickAdd}
                 disabled={data.status !== "TERSEDIA" || data.stock <= 0 || submitting}
               >
@@ -255,7 +280,12 @@ export default function AssetDetailPage({ params }: { params: Params }) {
               Batal
             </AlertDialogCancel>
             <AlertDialogAction
-              className="rounded-xl"
+              className="rounded-xl !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+              style={{
+                background:
+                  "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                color: "white",
+              }}
               onClick={handleConfirmAdd}
               disabled={submitting}
             >

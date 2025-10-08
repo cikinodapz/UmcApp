@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Home, Package, Calendar, CreditCard, RotateCcw, MessageSquare, Bell, User, Menu, X, ShoppingCart, TimerIcon, Timer, HandCoins, Clock } from "lucide-react"
 import Image from "next/image"
+import { title } from "process"
 
 const peminjamMenuItems = [
   {
@@ -19,6 +20,11 @@ const peminjamMenuItems = [
     icon: Package,
   },
   {
+    title: "Pemesanan",
+    href: "/booking",
+    icon: ShoppingCart,
+  },
+  {
     title: "Sedang Dipinjam",
     href: "/dipinjam",
     icon: Clock,
@@ -30,12 +36,12 @@ const peminjamMenuItems = [
   },
   {
     title: "Pengembalian",
-    href: "/returns",
+    href: "/pengembalian",
     icon: RotateCcw,
   },
   {
     title: "Notifikasi",
-    href: "/notifications",
+    href: "/notifikasi",
     icon: Bell,
   },
   {
@@ -52,13 +58,13 @@ export function PeminjamNavbar() {
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
   }
-
+  
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="w-10 h-10 flex items-center justify-center">
               <Image
                 src="/logo.png"

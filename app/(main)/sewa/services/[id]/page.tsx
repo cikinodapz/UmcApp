@@ -170,12 +170,28 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
               </Badge>
             </div>
 
-            <div className="mt-5 space-y-3 text-sm text-gray-700">
-              <p className="text-gray-700 whitespace-pre-wrap">{data.description || "—"}</p>
-              <p>
-                <span className="text-gray-500">Tarif:</span>{" "}
-                <span className="font-semibold">{formatCurrency(Number(data.unitRate || 0))}</span>
-              </p>
+            <div className="mt-5 space-y-4">
+              <div className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 text-indigo-700 px-3 py-1 font-semibold">
+                {formatCurrency(Number(data.unitRate || 0))} / unit
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="text-gray-500">Status</span>
+                  <span className="font-medium">{data.isActive ? "Aktif" : "Nonaktif"}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <span className="text-gray-500">Kategori</span>
+                  <span className="font-medium">{data.category?.name ?? "Umum"}</span>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-900 mb-1">Deskripsi</p>
+                <div className="rounded-xl border bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                  {data.description || "-"}
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 flex items-center gap-3">
@@ -191,7 +207,12 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
               </div>
 
               <Button
-                className="rounded-xl"
+                className="rounded-xl !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+                style={{
+                  background:
+                    "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                  color: "white",
+                }}
                 onClick={onClickAdd}
                 disabled={!data.isActive || submitting}
               >
@@ -233,7 +254,12 @@ export default function ServiceDetailPage({ params }: { params: Params }) {
               Batal
             </AlertDialogCancel>
             <AlertDialogAction
-              className="rounded-xl"
+              className="rounded-xl !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+              style={{
+                background:
+                  "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                color: "white",
+              }}
               onClick={handleConfirmAdd}
               disabled={submitting}
             >
