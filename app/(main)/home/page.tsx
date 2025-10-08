@@ -100,7 +100,12 @@ export default function DashboardPage() {
           </div>
           <Button
             asChild
-            className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white"
+            className="rounded-xl h-12 !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+            style={{
+              background:
+                "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+              color: "white",
+            }}
           >
             <Link href="/bookings/new">
               <Plus className="w-4 h-4 mr-2" />
@@ -200,7 +205,15 @@ export default function DashboardPage() {
                   <Button asChild variant="outline" className="rounded-xl">
                     <Link href={`/bookings/${upcomingBooking.id}`}>Detail</Link>
                   </Button>
-                  <Button asChild className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700">
+                  <Button
+                    asChild
+                    className="rounded-xl h-12 !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+                    style={{
+                      background:
+                        "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                      color: "white",
+                    }}
+                  >
                     <Link href="/bookings">Kelola Booking</Link>
                   </Button>
                 </div>
@@ -211,7 +224,15 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-500 mt-1">
                   Buat booking baru untuk memulai peminjaman aset atau jasa.
                 </p>
-                <Button asChild className="mt-4 rounded-xl">
+                <Button
+                  asChild
+                  className="mt-4 rounded-xl h-12 !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+                  style={{
+                    background:
+                      "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                    color: "white",
+                  }}
+                >
                   <Link href="/bookings/new">
                     <Plus className="w-4 h-4 mr-2" />
                     Buat Booking

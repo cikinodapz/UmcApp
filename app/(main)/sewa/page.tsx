@@ -582,7 +582,7 @@ export default function PemesananPage() {
         <div className="hidden md:block">
           <Button
             variant="outline"
-            className="rounded-lg"
+            className="rounded-xl"
             onClick={clearCart}
             disabled={
               cartLoading || cart.length === 0 || cartBusy === "clear-all"
@@ -745,7 +745,12 @@ export default function PemesananPage() {
                     <Dialog open={open} onOpenChange={setOpen}>
                       <DialogTrigger asChild>
                         <Button
-                          className="w-full rounded-lg"
+                          className="w-full rounded-xl h-12 !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+                          style={{
+                            background:
+                              "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                            color: "white",
+                          }}
                           disabled={cart.length === 0}
                         >
                           Checkout
@@ -791,6 +796,12 @@ export default function PemesananPage() {
                           <Button
                             onClick={handleCheckout}
                             disabled={checkoutBusy}
+                            className="rounded-xl h-12 !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+                            style={{
+                              background:
+                                "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                              color: "white",
+                            }}
                           >
                             {checkoutBusy ? (
                               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -802,7 +813,7 @@ export default function PemesananPage() {
                     </Dialog>
                     <Button
                       variant="outline"
-                      className="w-full rounded-lg mt-3"
+                      className="w-full rounded-xl mt-3"
                       onClick={clearCart}
                       disabled={
                         cartLoading ||
@@ -841,7 +852,12 @@ export default function PemesananPage() {
                     Tambahkan item ke keranjang dan lakukan checkout
                   </p>
                   <Button
-                    className="mt-4 rounded-lg"
+                    className="mt-4 rounded-xl h-12 !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+                    style={{
+                      background:
+                        "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                      color: "white",
+                    }}
                     onClick={() => setTab("katalog")}
                   >
                     <ShoppingCart className="w-4 h-4 mr-2" />
@@ -1086,7 +1102,7 @@ function GridAssets({
                   asChild
                   variant="outline"
                   size="sm"
-                  className="rounded-lg"
+                  className="rounded-xl"
                 >
                   <Link href={`/sewa/assets/${a.id}`}>
                     <Info className="w-4 h-4 mr-1" />
@@ -1095,7 +1111,12 @@ function GridAssets({
                 </Button>
                 <Button
                   size="sm"
-                  className="rounded-lg"
+                  className="rounded-xl !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 !border-0"
+                  style={{
+                    background:
+                      "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                    color: "white",
+                  }}
                   onClick={() => onAdd(a.id)}
                   disabled={isBusy}
                 >
@@ -1179,7 +1200,7 @@ function GridServices({
                   asChild
                   variant="outline"
                   size="sm"
-                  className="rounded-lg"
+                  className="rounded-xl"
                 >
                   <Link href={`/sewa/services/${s.id}`}>
                     <Info className="w-4 h-4 mr-1" />
@@ -1188,7 +1209,12 @@ function GridServices({
                 </Button>
                 <Button
                   size="sm"
-                  className="rounded-lg"
+                  className="rounded-xl !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 !border-0"
+                  style={{
+                    background:
+                      "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+                    color: "white",
+                  }}
                   onClick={() => onAdd(s.id)}
                   disabled={isBusy}
                 >
