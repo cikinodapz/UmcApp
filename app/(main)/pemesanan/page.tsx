@@ -196,10 +196,15 @@ export default function BookingsPage() {
       setLoading(true);
       try {
         const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
-        const data = await fetchData<{ bookings: any[] }>(endpoint, {
+        const data = await fetchData<any>(endpoint, {
           method: "GET",
         });
-        setBookings(data?.bookings || []);
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.bookings)
+          ? data.bookings
+          : [];
+        setBookings(list);
       } catch (e: any) {
         const msg = e?.response?.data?.message || "Gagal memuat data booking";
         Swal.fire({ icon: "error", title: "Error", text: msg });
@@ -219,8 +224,8 @@ export default function BookingsPage() {
     )
     .sort(
       (a, b) =>
-        new Date(b.startDatetime).getTime() -
-        new Date(a.startDatetime).getTime()
+        new Date(b.startDate || b.startDatetime).getTime() -
+        new Date(a.startDate || a.startDatetime).getTime()
     );
 
   // Paginate data
@@ -232,8 +237,8 @@ export default function BookingsPage() {
   // Helpers
   const computeTotal = (items: any[] = []) =>
     items.reduce((sum, it) => {
-      const qty = Number(it?.qty || 0);
-      const price = Number(it?.price || 0);
+      const qty = Number(it?.quantity ?? it?.qty ?? 0);
+      const price = Number(it?.unitPrice ?? it?.price ?? 0);
       return sum + qty * price;
     }, 0);
 
@@ -250,6 +255,30 @@ export default function BookingsPage() {
       setDetailOpen(false);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    try {
+      await fetchData(`/bookings/${id}`, { method: "DELETE" });
+      Swal.fire({
+        icon: "success",
+        title: "Dibatalkan",
+        text: "Booking berhasil dibatalkan",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
+      const data = await fetchData<any>(endpoint, { method: "GET" });
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.bookings)
+        ? data.bookings
+        : [];
+      setBookings(list);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Gagal membatalkan booking";
+      Swal.fire({ icon: "error", title: "Error", text: msg });
     }
   };
 
@@ -279,15 +308,15 @@ export default function BookingsPage() {
         ]
       : []),
     {
-      key: "startDatetime",
+      key: "startDate",
       title: "Tanggal Mulai",
-      render: (value: string) => formatDateTime(value),
+      render: (_: any, row: any) => formatDateTime(row.startDate || row.startDatetime),
       sortable: true,
     },
     {
-      key: "endDatetime",
+      key: "endDate",
       title: "Tanggal Selesai",
-      render: (value: string) => formatDateTime(value),
+      render: (_: any, row: any) => formatDateTime(row.endDate || row.endDatetime),
     },
     {
       key: "items",
@@ -298,7 +327,7 @@ export default function BookingsPage() {
       key: "totalAmount",
       title: "Total",
       render: (value: number, row: any) =>
-        formatCurrency(value ?? computeTotal(row?.items || [])),
+        formatCurrency(Number(row?.totalAmount ?? value ?? computeTotal(row?.items || []))),
     },
     {
       key: "status",
@@ -351,6 +380,18 @@ export default function BookingsPage() {
                 <XCircle className="w-4 h-4" />
               </Button>
             </>
+          )}
+
+          {!isAdmin && booking.status === "MENUNGGU" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-lg text-red-600 hover:text-red-700"
+              onClick={() => handleCancel(booking.id)}
+              title="Batalkan booking"
+            >
+              Batalkan
+            </Button>
           )}
         </div>
       ),
@@ -572,13 +613,13 @@ export default function BookingsPage() {
                 <div className="p-4 rounded-xl border bg-gray-50">
                   <div className="text-xs text-gray-500">Tanggal Mulai</div>
                   <div className="mt-1 font-medium break-words">
-                    {formatDateTime(detailData.startDatetime)}
+                    {formatDateTime(detailData.startDate || detailData.startDatetime)}
                   </div>
                 </div>
                 <div className="p-4 rounded-xl border bg-gray-50">
                   <div className="text-xs text-gray-500">Tanggal Selesai</div>
                   <div className="mt-1 font-medium break-words">
-                    {formatDateTime(detailData.endDatetime)}
+                    {formatDateTime(detailData.endDate || detailData.endDatetime)}
                   </div>
                 </div>
 
@@ -603,7 +644,8 @@ export default function BookingsPage() {
                 </div>
                 <div className="divide-y max-h-72 overflow-auto">
                   {(detailData.items ?? []).map((it: any) => {
-                    const isService = it.itemType === "JASA";
+                    const itemType = it.type || it.itemType;
+                    const isService = itemType === "JASA";
                     const name = isService ? it.service?.name : it.asset?.name;
                     const code = isService ? it.service?.code : it.asset?.code;
                     return (
@@ -619,20 +661,18 @@ export default function BookingsPage() {
                             {code ? `Kode: ${code}` : ""}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Tipe: {it.itemType}
+                            Tipe: {itemType}
                           </div>
                         </div>
                         <div className="flex items-center gap-4 sm:gap-8 w-full sm:w-auto justify-between sm:justify-end">
                           <div className="text-sm text-gray-600">
-                            Qty: {it.qty}
+                            Qty: {it.quantity ?? it.qty}
                           </div>
                           <div className="text-sm">
-                            {formatCurrency(Number(it.price || 0))}
+                            {formatCurrency(Number(it.unitPrice ?? it.price ?? 0))}
                           </div>
                           <div className="font-semibold whitespace-nowrap">
-                            {formatCurrency(
-                              Number(it.qty || 0) * Number(it.price || 0)
-                            )}
+                            {formatCurrency(Number(it.subtotal ?? ((Number(it.quantity ?? it.qty ?? 0)) * Number(it.unitPrice ?? it.price ?? 0))))}
                           </div>
                         </div>
                       </div>

@@ -15,30 +15,35 @@ const peminjamMenuItems = [
     icon: Home,
   },
   {
-    title: "Aset & Jasa",
-    href: "/sewa",
-    icon: Package,
+    title: "Katalog Jasa",
+    href: "/katalog",
+    icon: HandCoins,
+  },
+  {
+    title: "Keranjang",
+    href: "/keranjang",
+    icon: ShoppingCart,
   },
   {
     title: "Pemesanan",
     href: "/booking",
-    icon: ShoppingCart,
+    icon: Calendar,
   },
-  {
-    title: "Sedang Dipinjam",
-    href: "/dipinjam",
-    icon: Clock,
-  },
-  {
-    title: "Riwayat Pinjaman",
-    href: "/riwayat",
-    icon: Timer,
-  },
-  {
-    title: "Pengembalian",
-    href: "/pengembalian",
-    icon: RotateCcw,
-  },
+  // {
+  //   title: "Sedang Dipinjam",
+  //   href: "/dipinjam",
+  //   icon: Clock,
+  // },
+  // {
+  //   title: "Riwayat Pinjaman",
+  //   href: "/riwayat",
+  //   icon: Timer,
+  // },
+  // {
+  //   title: "Pengembalian",
+  //   href: "/pengembalian",
+  //   icon: RotateCcw,
+  // },
   {
     title: "Notifikasi",
     href: "/notifikasi",
