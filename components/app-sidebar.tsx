@@ -23,6 +23,7 @@ import { useState } from "react";
 
 const adminMenuItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Layanan", href: "/layanan", icon: Package }, 
   {
     title: "Inventaris",
     icon: Package,

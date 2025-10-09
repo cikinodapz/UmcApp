@@ -1,371 +1,422 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
-import { formatCurrency } from "@/lib/format"
-import { CalendarCheck, Eye, Search, Star, Boxes, Wrench } from "lucide-react"
+import { useEffect, useMemo, useState } from "react";
+import { DataTable } from "@/components/data-table";
+import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { formatCurrency, formatDateTime } from "@/lib/format";
+import { api, fetchData } from "@/lib/api";
+import { CreditCard, ExternalLink, RefreshCw, Eye } from "lucide-react";
+import Image from "next/image";
+import { PaymentMethod, PaymentStatus } from "@/types";
 
-type Kind = "aset" | "jasa"
-type LoanStatus = "ONGOING" | "OVERDUE" | "RETURNED"
-type Condition = "BAIK" | "RUSAK_RINGAN" | "RUSAK_BERAT" | "HILANG"
+type ApiUser = {
+  id: string;
+  name: string;
+  email: string;
+};
 
-type LoanItem = {
-  kind: Kind
-  id: string
-  code: string
-  name: string
-  photoUrl?: string | null
-  qty: number
-  unitPrice: number
-  startDate: string // ISO
-  dueDate: string // ISO
-  returnedAt?: string | null // ISO
-  status: LoanStatus
-  notes?: string | null
-  // riwayat
-  condition?: Condition | null
-  rating?: number | null // 1..5
-  _showDetail?: boolean
-}
+type ApiBooking = {
+  id: string;
+  userId: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  user?: ApiUser;
+};
 
-const STORAGE_KEY = "loans-state-v1"
+type ApiPayment = {
+  id: string;
+  bookingId: string;
+  amount: string; // API returns string numbers
+  method: keyof typeof PaymentMethod | string;
+  status: keyof typeof PaymentStatus | string;
+  paidAt: string | null;
+  referenceNo: string | null;
+  proofUrl?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  booking?: ApiBooking;
+};
 
-export default function RiwayatPage() {
-  const { toast } = useToast()
-  const [q, setQ] = useState("")
-  const [cond, setCond] = useState<"all" | Condition>("all")
-  const [from, setFrom] = useState<string>("")
-  const [to, setTo] = useState<string>("")
-  const [items, setItems] = useState<LoanItem[]>([])
+type StatusResponse = {
+  paymentStatus: string;
+  midtransStatus?: string;
+  details?: any;
+};
 
-  // hydrate
+export default function RiwayatPembayaranPage() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<ApiPayment[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<ApiPayment | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [bookingDetail, setBookingDetail] = useState<any | null>(null);
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        setItems(JSON.parse(raw))
-      } else {
-        // seed contoh riwayat
-        const now = new Date()
-        const iso = (d: Date) => d.toISOString()
-        const makeDate = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d, 3, 0, 0))
-        const demo: LoanItem[] = [
-          {
-            kind: "jasa",
-            id: "HIS-003",
-            code: "SRV-FOTO-EVT",
-            name: "Jasa Fotografi Event",
-            qty: 1,
-            unitPrice: 500000,
-            startDate: iso(makeDate(2024, 1, 4)),
-            dueDate: iso(makeDate(2024, 1, 5)),
-            returnedAt: iso(makeDate(2024, 1, 5)),
-            status: "RETURNED",
-            condition: "BAIK",
-            rating: 5,
-            notes: "Dokumentasi seminar, file dikirim via Drive.",
-          },
-          {
-            kind: "aset",
-            id: "HIS-002",
-            code: "CAM-DSLR-A1",
-            name: "Kamera DSLR Canon",
-            qty: 1,
-            unitPrice: 150000,
-            startDate: iso(makeDate(2023, 12, 10)),
-            dueDate: iso(makeDate(2023, 12, 12)),
-            returnedAt: iso(makeDate(2023, 12, 12)),
-            status: "RETURNED",
-            condition: "RUSAK_RINGAN",
-            rating: 4,
-            notes: "Sedikit scratch pada lens cap.",
-          },
-          {
-            kind: "aset",
-            id: "HIS-001",
-            code: "TRP-VID-02",
-            name: "Tripod Video Heavy Duty",
-            qty: 1,
-            unitPrice: 50000,
-            startDate: iso(makeDate(2023, 11, 1)),
-            dueDate: iso(makeDate(2023, 11, 4)),
-            returnedAt: iso(makeDate(2023, 11, 4)),
-            status: "RETURNED",
-            condition: "BAIK",
-            rating: 5,
-            notes: "Semua kaki tripod normal.",
-          },
-        ]
-        setItems(demo)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(demo))
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchData("/payments");
+        if (!active) return;
+        setItems(Array.isArray(data) ? data : []);
+      } catch (e: any) {
+        if (!active) return;
+        setError(e?.message || "Gagal memuat riwayat pembayaran");
+      } finally {
+        if (active) setLoading(false);
       }
-    } catch {}
-  }, [])
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  // derived: hanya returned
-  const returned = useMemo(() => items.filter((i) => i.status === "RETURNED"), [items])
+  const data = useMemo(() => {
+    const mapped = items.map((p) => ({
+      ...p,
+      amountNumber: Number(p.amount ?? 0),
+      bookingCode: p.booking?.id?.slice(-8) ?? p.bookingId?.slice(-8) ?? "-",
+      userName: p.booking?.user?.name ?? "-",
+      userEmail: p.booking?.user?.email ?? "",
+      startDate: p.booking?.startDate ?? "",
+      endDate: p.booking?.endDate ?? "",
+    }));
+    return mapped.filter((it) => statusFilter === "all" || it.status === statusFilter);
+  }, [items, statusFilter]);
 
-  // filter
-  const visible = useMemo(() => {
-    const text = q.trim().toLowerCase()
-    const fromTs = from ? new Date(from).getTime() : null
-    const toTs = to ? new Date(to).getTime() : null
+  // Simple aggregate values if needed later (not rendered to keep UI minimal)
+  const _aggregate = useMemo(() => ({
+    total: items.length,
+    pending: items.filter((x) => x.status === PaymentStatus.PENDING).length,
+    paid: items.filter((x) => x.status === PaymentStatus.PAID).length,
+    totalAmount: items.reduce((sum, x) => sum + Number(x.amount || 0), 0),
+  }), [items]);
 
-    return returned
-      .filter((i) =>
-        !text
-          ? true
-          : i.name.toLowerCase().includes(text) ||
-            i.code.toLowerCase().includes(text) ||
-            (i.notes ?? "").toLowerCase().includes(text),
-      )
-      .filter((i) => (cond === "all" ? true : i.condition === cond))
-      .filter((i) => {
-        if (!fromTs && !toTs) return true
-        const ret = i.returnedAt ? new Date(i.returnedAt).getTime() : new Date(i.dueDate).getTime()
-        if (fromTs && ret < fromTs) return false
-        if (toTs && ret > toTs + 24 * 60 * 60 * 1000 - 1) return false // inclusive
-        return true
-      })
-      .sort((a, b) => (b.returnedAt ? new Date(b.returnedAt).getTime() : 0) - (a.returnedAt ? new Date(a.returnedAt).getTime() : 0))
-  }, [returned, q, cond, from, to])
+  const columns = [
+    {
+      key: "bookingCode",
+      title: "Booking",
+      render: (v: string) => (
+        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-md">{v}</span>
+      ),
+    },
+    {
+      key: "userName",
+      title: "Pengguna",
+      render: (v: string, row: any) => (
+        <div>
+          <p className="font-medium">{v}</p>
+          {row.userEmail ? (
+            <p className="text-sm text-gray-500">{row.userEmail}</p>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: "amountNumber",
+      title: "Jumlah",
+      render: (v: number) => formatCurrency(v || 0),
+      sortable: true,
+    },
+    {
+      key: "method",
+      title: "Metode",
+      render: (v: string) => v,
+    },
+    {
+      key: "status",
+      title: "Status",
+      render: (v: string) => <StatusBadge status={v} />,
+    },
+    {
+      key: "paidAt",
+      title: "Dibayar Pada",
+      render: (v: string | null) => (v ? formatDateTime(v) : "-"),
+      sortable: true,
+    },
+    {
+      key: "referenceNo",
+      title: "Referensi",
+      render: (v: string | null) => v || "-",
+    },
+    {
+      key: "actions",
+      title: "Aksi",
+      render: (_: any, row: ApiPayment) => (
+        <div className="flex items-center gap-2">
+          {row.status === PaymentStatus.PENDING && row.proofUrl ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open(row.proofUrl!, "_blank")}
+              className="rounded-lg"
+            >
+              <ExternalLink className="w-4 h-4 mr-1" /> Bayar
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleCheckStatus(row)}
+            className="rounded-lg"
+          >
+            <RefreshCw className="w-4 h-4 mr-1" /> Cek Status
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => openDetail(row)}
+            className="rounded-lg"
+          >
+            <Eye className="w-4 h-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
-  // actions
-  function toggleDetail(id: string) {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, _showDetail: !i._showDetail } : i)))
+  function toServicePhoto(p?: string | null) {
+    if (!p) return null;
+    if (/^https?:\/\//i.test(p)) return p;
+    const base = process.env.NEXT_PUBLIC_API_URL || "";
+    const path = p.startsWith("/uploads/") ? p : `/uploads/${p}`;
+    return `${base}${path}`;
   }
 
-  function setRating(id: string, rating: number) {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, rating } : i)))
-    toast({ title: "Terima kasih!", description: "Penilaian kamu sudah disimpan." })
+  async function handleCheckStatus(p: ApiPayment) {
+    try {
+      const res: StatusResponse = await fetchData(`/payments/${p.id}/status`);
+      // Prefer backend paymentStatus if provided
+      const nextStatus = res.paymentStatus || p.status;
+      setItems((prev) => prev.map((it) => (it.id === p.id ? { ...it, status: nextStatus, paidAt: it.paidAt ?? (res.midtransStatus === "settlement" ? new Date().toISOString() : it.paidAt) } : it)));
+      toast({
+        title: "Status diperbarui",
+        description: `Midtrans: ${res.midtransStatus || "-"}`,
+      });
+    } catch (e: any) {
+      toast({ title: "Gagal cek status", description: e?.message ?? "Terjadi kesalahan" });
+    }
   }
 
-  function setCondition(id: string, condition: Condition) {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, condition } : i)))
-    toast({ title: "Kondisi diperbarui", description: `Item #${id.slice(-6)} diset ke ${conditionToText(condition)}.` })
+  async function openDetail(p: ApiPayment) {
+    setSelected(p);
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setBookingDetail(null);
+    try {
+      // Fetch payment detail (includes booking + items)
+      const detail = await fetchData(`/payments/${p.id}`, { method: "GET" });
+      // Update selected to latest server state
+      setSelected(detail);
+      setBookingDetail(detail?.booking || null);
+    } catch (e: any) {
+      // keep dialog open, but show minimal info
+      setBookingDetail(null);
+    } finally {
+      setDetailLoading(false);
+    }
   }
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900">Riwayat Peminjaman</h1>
-        <p className="text-gray-600">Semua peminjaman yang telah selesai.</p>
-      </header>
-
-      {/* Filter bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div className="md:col-span-2 relative">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari nama, kode, atau catatan…"
-            className="rounded-xl pl-9"
-          />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        </div>
-
-        <Select value={cond} onValueChange={(v) => setCond(v as any)}>
-          <SelectTrigger className="rounded-xl">
-            <SelectValue placeholder="Kondisi" />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            <SelectItem value="all">Semua Kondisi</SelectItem>
-            <SelectItem value="BAIK">BAIK</SelectItem>
-            <SelectItem value="RUSAK_RINGAN">RUSAK_RINGAN</SelectItem>
-            <SelectItem value="RUSAK_BERAT">RUSAK_BERAT</SelectItem>
-            <SelectItem value="HILANG">HILANG</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-xl" />
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-xl" />
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Riwayat Pembayaran</h1>
+        <p className="text-gray-600 mt-2">Lihat dan kelola status pembayaran Anda</p>
       </div>
 
-      {/* List */}
-      {visible.length === 0 ? (
-        <EmptyState
-          text="Belum ada riwayat sesuai filter."
-          hint={
-            <>
-              Lakukan peminjaman dari{" "}
-              <Link href="/pemesanan" className="underline">/pemesanan</Link> atau cek{" "}
-              <Link href="/peminjaman/aktif" className="underline">/peminjaman/aktif</Link>.
-            </>
-          }
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        </div>
+      ) : error ? (
+        <Card className="p-6 rounded-2xl border border-red-200 bg-red-50 text-red-700">
+          {error}
+        </Card>
+      ) : data.length === 0 ? (
+        <Card className="p-8 text-center rounded-xl border bg-white">
+          <div className="text-sm text-gray-600">Belum ada riwayat pembayaran.</div>
+        </Card>
+      ) : (
+        <DataTable
+          data={data as any}
+          columns={columns as any}
+          searchPlaceholder="Cari pembayaran..."
+          pageSize={10}
+          className="rounded-xl"
+          renderHeader={({ searchQuery, setSearchQuery }) => (
+            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <CreditCard className="w-5 h-5 text-gray-400" />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-48 md:w-56 rounded-lg">
+                    <SelectValue placeholder="Filter status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value={PaymentStatus.PENDING}>Pending</SelectItem>
+                    <SelectItem value={PaymentStatus.PAID}>Lunas</SelectItem>
+                    <SelectItem value={PaymentStatus.FAILED}>Gagal</SelectItem>
+                    <SelectItem value={PaymentStatus.REFUNDED}>Dikembalikan</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="text-sm text-gray-500 hidden md:block">Menampilkan {data.length} pembayaran</div>
+              </div>
+
+              <div className="relative w-full md:w-64">
+                <input
+                  placeholder="Cari pembayaran..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-10 pl-10 pr-3 rounded-lg border border-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                />
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+              </div>
+            </div>
+          )}
         />
-      ) : (
-        <div className="space-y-4">
-          {visible.map((i, idx) => (
-            <Card key={i.id} className="rounded-2xl">
-              <CardContent className="p-4 md:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  {/* left: thumbnail + info */}
-                  <div className="flex items-start gap-4 min-w-0">
-                    <Thumb kind={i.kind} photoUrl={i.photoUrl} name={i.name} />
+      )}
 
-                    <div className="min-w-0">
-                      <div className="text-lg font-semibold truncate">Peminjaman #{visible.length - idx}</div>
-                      <div className="text-gray-700 truncate">{i.name}</div>
-
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <div className="inline-flex items-center gap-1 text-gray-600 text-sm">
-                          <CalendarCheck className="w-4 h-4" />
-                          <span>Dikembalikan: {fmtDate(i.returnedAt || i.dueDate)}</span>
-                        </div>
-                        <Badge variant={conditionVariant(i.condition)} className="rounded-md">
-                          Kondisi: {conditionToText(i.condition)}
-                        </Badge>
-                        {i.rating ? (
-                          <div className="inline-flex items-center gap-1 text-amber-500 text-sm">
-                            <Star className="w-4 h-4 fill-current" />
-                            <span>{i.rating}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* right: actions */}
-                  <div className="shrink-0 flex flex-col items-end gap-2">
-                    <Button variant="outline" size="sm" className="rounded-md" onClick={() => toggleDetail(i.id)}>
-                      <Eye className="w-4 h-4 mr-1" /> Detail
-                    </Button>
-
-                    {/* quick rating */}
-                    <StarRating value={i.rating ?? 0} onChange={(v) => setRating(i.id, v)} />
-
-                    {/* kondisi select */}
-                    <Select value={(i.condition ?? "BAIK") as any} onValueChange={(v) => setCondition(i.id, v as Condition)}>
-                      <SelectTrigger className="h-8 rounded-md">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="BAIK">BAIK</SelectItem>
-                        <SelectItem value="RUSAK_RINGAN">RUSAK_RINGAN</SelectItem>
-                        <SelectItem value="RUSAK_BERAT">RUSAK_BERAT</SelectItem>
-                        <SelectItem value="HILANG">HILANG</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="sm:max-w-[520px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Detail Pembayaran</DialogTitle>
+            <DialogDescription>Informasi lengkap transaksi dan pemesanan</DialogDescription>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Booking</p>
+                  <p className="font-medium">{selected.booking?.id?.slice(-8) ?? selected.bookingId?.slice(-8)}</p>
                 </div>
+                <div>
+                  <p className="text-gray-500">Jumlah</p>
+                  <p className="font-medium">{formatCurrency(Number(selected.amount || 0))}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Metode</p>
+                  <p className="font-medium">{selected.method}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Status</p>
+                  <StatusBadge status={selected.status} />
+                </div>
+                <div>
+                  <p className="text-gray-500">Dibuat</p>
+                  <p className="font-medium">{formatDateTime(selected.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Diperbarui</p>
+                  <p className="font-medium">{formatDateTime(selected.updatedAt)}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-gray-500">Rentang Waktu</p>
+                  <p className="font-medium">
+                    {selected.booking?.startDate ? formatDateTime(selected.booking.startDate) : "-"} -
+                    {" "}
+                    {selected.booking?.endDate ? formatDateTime(selected.booking.endDate) : "-"}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-gray-500">Referensi</p>
+                  <p className="font-medium">{selected.referenceNo || "-"}</p>
+                </div>
+              </div>
 
-                {/* detail */}
-                {i._showDetail && (
-                  <div className="mt-4 rounded-xl border p-4 bg-gray-50">
-                    <DetailBlock item={i} />
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button asChild variant="outline" size="sm" className="rounded-md">
-                        <Link href={`/invoice/${i.id}`}>Lihat Kwitansi</Link>
-                      </Button>
-                      <Button asChild variant="outline" size="sm" className="rounded-md">
-                        <Link href={`/ulasan/${i.id}`}>Tulis Ulasan</Link>
-                      </Button>
-                    </div>
+              {/* Detail Pesanan mirip /booking */}
+              <Separator />
+              <div className="space-y-3">
+                <div className="text-sm font-medium">Detail Pesanan</div>
+                {detailLoading ? (
+                  <div className="text-sm text-muted-foreground">Memuat detail pesanan...</div>
+                ) : bookingDetail?.items && bookingDetail.items.length > 0 ? (
+                  <div className="space-y-3">
+                    {bookingDetail.items.map((it: any) => {
+                      const img = toServicePhoto(it?.service?.photoUrl || null);
+                      const features: string[] = it?.package?.features || [];
+                      const shown = features.slice(0, 3);
+                      const more = Math.max(0, features.length - shown.length);
+                      return (
+                        <div key={it.id} className="flex items-start gap-3">
+                          <div className="h-14 w-14 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                            {img ? (
+                              <Image src={img} alt={it?.service?.name || "Service"} width={56} height={56} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">No Img</div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="font-medium truncate" title={it?.service?.name || ""}>{it?.service?.name || "-"}</div>
+                              {it?.package?.name ? (
+                                <Badge variant="outline" className="rounded-md whitespace-nowrap">{it?.package?.name}</Badge>
+                              ) : null}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {(it?.quantity ?? it?.qty ?? 0)} x {formatCurrency(Number(it?.unitPrice ?? it?.price ?? 0))} • Subtotal {formatCurrency(Number(it?.subtotal ?? (Number(it?.unitPrice ?? it?.price ?? 0) * Number(it?.quantity ?? it?.qty ?? 0))))}
+                            </div>
+                            {shown.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {shown.map((f, idx) => (
+                                  <Badge key={idx} variant="secondary" className="rounded-md text-[10px] py-0 px-1.5">{f}</Badge>
+                                ))}
+                                {more > 0 ? (
+                                  <Badge variant="outline" className="rounded-md text-[10px] py-0 px-1.5">+{more} lagi</Badge>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Tidak ada item pesanan untuk booking ini.</div>
                 )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </div>
+
+              {selected.proofUrl && (
+                <div>
+                  <p className="text-gray-500 text-sm mb-2">Tautan Pembayaran / Bukti</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(selected.proofUrl!, "_blank")}
+                    className="rounded-lg"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" /> Buka Tautan
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setDetailOpen(false)}>
+              Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
-}
-
-/* ================= Komponen ================= */
-
-function Thumb({ kind, photoUrl, name }: { kind: Kind; photoUrl?: string | null; name: string }) {
-  return (
-    <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-50 shrink-0">
-      {photoUrl ? (
-        <Image src={photoUrl} alt={name} fill className="object-cover" />
-      ) : (
-        <div className="w-full h-full grid place-items-center bg-gradient-to-br from-indigo-50 to-violet-50">
-          {kind === "aset" ? <Boxes className="w-6 h-6 text-indigo-400" /> : <Wrench className="w-6 h-6 text-violet-400" />}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return (
-    <div className="inline-flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          aria-label={`rating-${n}`}
-          className={`p-0.5 ${n <= value ? "text-amber-500" : "text-gray-300"} hover:text-amber-500`}
-          onClick={() => onChange(n)}
-        >
-          <Star className={`w-4 h-4 ${n <= value ? "fill-current" : ""}`} />
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function DetailBlock({ item }: { item: LoanItem }) {
-  return (
-    <div className="text-sm text-gray-700 space-y-1">
-      <Row label="Kode" value={<span className="font-mono">#{item.code}</span>} />
-      <Row label="Jenis" value={item.kind.toUpperCase()} />
-      <Row label="Qty" value={String(item.qty)} />
-      <Row label="Tarif Satuan" value={formatCurrency(item.unitPrice)} />
-      <Row label="Mulai" value={fmtDate(item.startDate)} />
-      <Row label="Jatuh Tempo" value={fmtDate(item.dueDate)} />
-      <Row label="Dikembalikan" value={fmtDate(item.returnedAt || item.dueDate)} />
-      {item.notes && <Row label="Catatan" value={item.notes} />}
-      <div className="pt-2 text-xs text-gray-500">
-        Subtotal estimasi: <strong>{formatCurrency(item.unitPrice * item.qty)}</strong> (belum termasuk denda/biaya lain).
-      </div>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-gray-500 w-40">{label}</span>
-      <div className="flex-1 font-medium">{value}</div>
-    </div>
-  )
-}
-
-/* ================ Utils & UI kecil ================ */
-
-function conditionToText(c?: Condition | null) {
-  if (!c) return "BAIK"
-  return c
-}
-
-function conditionVariant(c?: Condition | null): "secondary" | "outline" | "destructive" {
-  if (c === "BAIK") return "secondary"
-  if (c === "RUSAK_RINGAN") return "outline"
-  if (c === "RUSAK_BERAT" || c === "HILANG") return "destructive"
-  return "outline"
-}
-
-function fmtDate(iso?: string | null) {
-  if (!iso) return "-"
-  const d = new Date(iso)
-  return d.toLocaleDateString("id-ID", { year: "numeric", month: "2-digit", day: "2-digit" })
-}
-
-function EmptyState({ text, hint }: { text: string; hint?: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border p-10 text-center text-gray-600">
-      <p className="font-medium">{text}</p>
-      {hint && <p className="text-sm text-gray-500 mt-1">{hint}</p>}
-    </div>
-  )
+  );
 }
