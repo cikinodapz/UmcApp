@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import Swal from 'sweetalert2';
 
 type Kind = "aset" | "jasa";
 
@@ -508,13 +509,28 @@ export default function PemesananPage() {
 
   // checkout handler
   async function handleCheckout() {
-    if (!startDatetime || !endDatetime || !notes) {
-      toast({
-        title: "Error",
-        description: "Isi semua field terlebih dahulu.",
-        variant: "destructive",
+    if (!startDatetime || !endDatetime) {
+      const missing: string[] = [];
+      if (!startDatetime) missing.push('Tanggal Mulai');
+      if (!endDatetime) missing.push('Tanggal Selesai');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Data belum lengkap',
+        html: `Mohon lengkapi: <b>${missing.join(', ')}</b>.`,
+        confirmButtonText: 'Lengkapi dulu',
       });
       return;
+    }
+    if (!notes) {
+      const res = await Swal.fire({
+        icon: 'question',
+        title: 'Catatan kosong?',
+        text: 'Anda belum mengisi catatan. Lanjutkan tanpa catatan?',
+        showCancelButton: true,
+        confirmButtonText: 'Lanjutkan',
+        cancelButtonText: 'Isi dulu',
+      });
+      if (!res.isConfirmed) return;
     }
     setCheckoutBusy(true);
     try {
@@ -574,7 +590,7 @@ export default function PemesananPage() {
             Pemesanan Aset & Jasa
           </h1>
           <p className="text-gray-600 mt-2">
-            Cari item → masukkan ke keranjang → checkout untuk buat booking.
+            Cari itemya → masukkan ke keranjang → checkout untuk buat booking.
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { fetchData } from "@/lib/api";
@@ -12,6 +12,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency, formatDate } from "@/lib/format";
 import Image from "next/image";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { XCircle } from "lucide-react";
 
 type Service = {
   id: string;
@@ -56,6 +58,8 @@ export default function BookingPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [hasPayment, setHasPayment] = useState<Record<string, boolean>>({});
 
   const loadBookings = useCallback(async () => {
     try {
@@ -74,7 +78,18 @@ export default function BookingPage() {
 
   useEffect(() => {
     loadBookings();
+    // Restore existing payment flags (to hide button after refresh)
+    try {
+      const raw = localStorage.getItem('hasPaymentMap');
+      if (raw) setHasPayment(JSON.parse(raw) || {});
+    } catch {}
   }, [loadBookings]);
+
+  const extractRejectReason = (notes?: string | null) => {
+    if (!notes) return null;
+    const m = notes.match(/Alasan ditolak:\s*(.*)/i);
+    return m ? m[1].trim() : null;
+  };
 
     const handleCancel = async (id: string) => {
     const res = await Swal.fire({
@@ -112,11 +127,62 @@ export default function BookingPage() {
     }
   };
 
+  const handlePay = async (id: string) => {
+    try {
+      setPayingId(id);
+      const res = await fetchData(`/payments/create/${id}`, { method: 'POST' });
+      // Expecting: { paymentUrl, token, payment }
+      const url = res?.paymentUrl || res?.payment?.proofUrl;
+      if (url) {
+        const newWin = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!newWin) {
+          await Swal.fire({
+            title: 'Popup diblokir',
+            text: 'Izinkan popup atau buka link pembayaran secara manual.',
+            icon: 'info',
+            confirmButtonText: 'OK',
+          });
+        }
+        // Mark as has payment to hide the button next time
+        setHasPayment((prev) => {
+          const next = { ...prev, [id]: true };
+          try { localStorage.setItem('hasPaymentMap', JSON.stringify(next)); } catch {}
+          return next;
+        });
+        return;
+      }
+      await Swal.fire({
+        title: 'Gagal',
+        text: 'URL pembayaran tidak tersedia',
+        icon: 'error',
+        confirmButtonText: 'OK',
+      });
+    } catch (e: any) {
+      // If API returns 400 because payment already exists, hide button for better UX
+      const msg: string = e?.message || '';
+      if (msg.includes('400')) {
+        setHasPayment((prev) => {
+          const next = { ...prev, [id]: true };
+          try { localStorage.setItem('hasPaymentMap', JSON.stringify(next)); } catch {}
+          return next;
+        });
+      }
+      await Swal.fire({
+        title: 'Gagal membuat pembayaran',
+        text: e?.message ?? 'Terjadi kesalahan',
+        icon: 'error',
+        confirmButtonText: 'OK',
+      });
+    } finally {
+      setPayingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Booking</h1>
-        <p className="text-sm text-muted-foreground">Daftar pemesanan terbaru Anda</p>
+        <h1 className="text-3xl font-bold text-gray-900">Booking</h1>
+        <p className="text-gray-600 mt-2">Daftar pemesanan terbaru Anda</p>
       </div>
 
       {loading && (
@@ -173,7 +239,15 @@ export default function BookingPage() {
                         <div className="text-lg font-semibold">{formatCurrency(Number(b.totalAmount))}</div>
                       </div>
                     </div>
-                    {b.notes ? (
+                    {b.status === 'DITOLAK' ? (
+                      <Alert variant="destructive" className="rounded-lg border-red-200 bg-red-50">
+                        <XCircle className="text-red-600" />
+                        <AlertTitle>Alasan Ditolak</AlertTitle>
+                        <AlertDescription>
+                          {extractRejectReason(b.notes) || b.notes || 'Permohonan ditolak oleh admin.'}
+                        </AlertDescription>
+                      </Alert>
+                    ) : b.notes ? (
                       <div className="text-sm text-muted-foreground line-clamp-2" title={b.notes}>Catatan: {b.notes}</div>
                     ) : null}
 
@@ -204,7 +278,7 @@ export default function BookingPage() {
                                     ) : null}
                                   </div>
                                   <div className="text-sm text-muted-foreground">
-                                    {it.quantity} x {formatCurrency(Number(it.unitPrice))} • Subtotal {formatCurrency(Number(it.subtotal))}
+                                    {it.quantity} x {formatCurrency(Number(it.unitPrice))} â€¢ Subtotal {formatCurrency(Number(it.subtotal))}
                                   </div>
                                   {shown.length > 0 ? (
                                     <div className="flex flex-wrap gap-1 pt-1">
@@ -226,18 +300,31 @@ export default function BookingPage() {
                   </CardContent>
                   <CardFooter className="mt-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <div className="text-xs text-muted-foreground">
-                      {formatDate(b.startDate)} — {formatDate(b.endDate)}
+                      {formatDate(b.startDate)} â€” {formatDate(b.endDate)}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="min-w-[108px]"
-                        disabled={cancellingId === b.id || b.status === 'DIBATALKAN'}
-                        onClick={() => handleCancel(b.id)}
-                      >
-                        {cancellingId === b.id ? 'Membatalkan...' : 'Batalkan'}
-                      </Button>
+                      {b.status === 'DIKONFIRMASI' && !hasPayment[b.id] ? (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="min-w-[108px]"
+                          disabled={payingId === b.id}
+                          onClick={() => handlePay(b.id)}
+                        >
+                          {payingId === b.id ? 'Memproses...' : 'Bayar'}
+                        </Button>
+                      ) : null}
+                      {b.status !== 'DIKONFIRMASI' && b.status !== 'DIBATALKAN' ? (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="min-w-[108px]"
+                          disabled={cancellingId === b.id}
+                          onClick={() => handleCancel(b.id)}
+                        >
+                          {cancellingId === b.id ? 'Membatalkan...' : 'Batalkan'}
+                        </Button>
+                      ) : null}
                     </div>
                   </CardFooter>
                 </Card>

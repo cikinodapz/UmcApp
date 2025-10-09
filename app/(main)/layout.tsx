@@ -13,6 +13,7 @@ import { Role } from "@/types";
 // DAFTAR PREFIX RUTE ADMIN — tambahkan semua rute admin-mu di sini
 const ADMIN_PREFIXES = [
   "/dashboard",
+  "/layanan",
   "/inventory",
   "/pemesanan",
   "/payments",

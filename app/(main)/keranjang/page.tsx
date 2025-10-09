@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import Swal from 'sweetalert2';
 import {
   Image as ImageIcon,
   Package,
@@ -215,42 +216,50 @@ export default function CartPage() {
     }
   };
 
-  const handleCheckout = async () => {
+    const handleCheckout = async () => {
     if (!items.length) {
-      toast({
-        title: "Keranjang kosong",
-        description: "Tambahkan item sebelum checkout",
-        variant: "destructive",
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Keranjang kosong',
+        text: 'Tambahkan item ke keranjang sebelum melanjutkan.',
       });
       return;
     }
     if (!startDate || !endDate) {
-      toast({
-        title: "Tanggal wajib diisi",
-        description: "Isi tanggal mulai dan selesai",
-        variant: "destructive",
+      const missing: string[] = [];
+      if (!startDate) missing.push('Tanggal Mulai');
+      if (!endDate) missing.push('Tanggal Selesai');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Data belum lengkap',
+        html: `Mohon lengkapi: <b>${missing.join(', ')}</b>.`,
+        confirmButtonText: 'Lengkapi dulu',
       });
       return;
     }
+
+    const res = await Swal.fire({
+      title: 'Lanjutkan pemesanan?',
+      text: 'Pastikan data sudah benar sebelum melanjutkan.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, lanjutkan',
+      cancelButtonText: 'Batal',
+      reverseButtons: true,
+    });
+
+    if (!res.isConfirmed) return;
+
     try {
       setCheckingOut(true);
-      const resp = await fetchData("/bookings/checkout", {
-        method: "POST",
-        data: {
-          startDate,
-          endDate,
-          notes: bookingNotes || undefined,
-        },
+      const resp = await fetchData('/bookings/checkout', {
+        method: 'POST',
+        data: { startDate, endDate, notes: bookingNotes || undefined },
       });
-      toast({ title: resp?.message || "Booking berhasil dibuat dari keranjang" });
-      // Setelah berhasil, arahkan ke halaman daftar booking
-      router.push("/booking");
+      await Swal.fire({ title: 'Berhasil', text: resp?.message || 'Booking berhasil dibuat dari keranjang', icon: 'success' });
+      router.push('/booking');
     } catch (error: any) {
-      toast({
-        title: "Checkout gagal",
-        description: error?.message || "Tidak dapat membuat booking",
-        variant: "destructive",
-      });
+      await Swal.fire({ title: 'Checkout gagal', text: error?.message || 'Tidak dapat membuat booking', icon: 'error' });
     } finally {
       setCheckingOut(false);
     }
@@ -501,7 +510,7 @@ export default function CartPage() {
                   className="w-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
                 >
                   <Package className="w-4 h-4 mr-2" />
-                  {checkingOut ? "Memproses…" : "Lanjutkan Pemesanan"}
+                  {checkingOut ? "Memprosesâ€¦" : "Lanjutkan Pemesanan"}
                 </Button>
                 <Button
                   variant="outline"
@@ -526,3 +535,4 @@ const toServicePhoto = (p?: string | null) => {
   const path = p.startsWith("/uploads/") ? p : `/uploads/${p}`;
   return `${base}${path}`;
 };
+

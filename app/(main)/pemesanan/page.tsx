@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { fetchData } from "@/lib/api";
 import Swal from "sweetalert2";
+import { Textarea } from "@/components/ui/textarea";
 
 // Pagination component (diambil dari kode inventory)
 function Pagination({
@@ -171,6 +172,7 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [bookingToAction, setBookingToAction] = useState<{
     id: string;
     userName: string;
@@ -190,6 +192,14 @@ export default function BookingsPage() {
 
   const isAdmin = user?.role === Role.ADMIN;
 
+  // Util: normalize list response
+  const normalizeList = (data: any): any[] => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.bookings)) return data.bookings;
+    return [];
+  };
+
   // Fetch bookings
   useEffect(() => {
     async function loadBookings() {
@@ -199,11 +209,7 @@ export default function BookingsPage() {
         const data = await fetchData<any>(endpoint, {
           method: "GET",
         });
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.bookings)
-          ? data.bookings
-          : [];
+        const list = normalizeList(data);
         setBookings(list);
       } catch (e: any) {
         const msg = e?.response?.data?.message || "Gagal memuat data booking";
@@ -270,12 +276,7 @@ export default function BookingsPage() {
       });
       const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
       const data = await fetchData<any>(endpoint, { method: "GET" });
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.bookings)
-        ? data.bookings
-        : [];
-      setBookings(list);
+      setBookings(normalizeList(data));
     } catch (e: any) {
       const msg = e?.response?.data?.message || "Gagal membatalkan booking";
       Swal.fire({ icon: "error", title: "Error", text: msg });
@@ -401,7 +402,7 @@ export default function BookingsPage() {
   const handleApprove = async () => {
     if (bookingToAction) {
       try {
-        await fetchData(`/bookings/${bookingToAction.id}/approve`, {
+        await fetchData(`/bookings/${bookingToAction.id}/confirm`, {
           method: "PATCH",
         });
         Swal.fire({
@@ -413,10 +414,8 @@ export default function BookingsPage() {
         });
         // Refresh bookings
         const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
-        const data = await fetchData<{ bookings: any[] }>(endpoint, {
-          method: "GET",
-        });
-        setBookings(data?.bookings || []);
+        const data = await fetchData<any>(endpoint, { method: "GET" });
+        setBookings(normalizeList(data));
       } catch (e: any) {
         const msg = e?.response?.data?.message || "Gagal menyetujui booking";
         Swal.fire({ icon: "error", title: "Error", text: msg });
@@ -432,6 +431,7 @@ export default function BookingsPage() {
       try {
         await fetchData(`/bookings/${bookingToAction.id}/reject`, {
           method: "PATCH",
+          data: { reason: rejectReason || "Ditolak oleh admin" },
         });
         Swal.fire({
           icon: "success",
@@ -442,16 +442,15 @@ export default function BookingsPage() {
         });
         // Refresh bookings
         const endpoint = isAdmin ? "/bookings/admin/all" : "/bookings";
-        const data = await fetchData<{ bookings: any[] }>(endpoint, {
-          method: "GET",
-        });
-        setBookings(data?.bookings || []);
+        const data = await fetchData<any>(endpoint, { method: "GET" });
+        setBookings(normalizeList(data));
       } catch (e: any) {
         const msg = e?.response?.data?.message || "Gagal menolak booking";
         Swal.fire({ icon: "error", title: "Error", text: msg });
       } finally {
         setBookingToAction(null);
         setRejectDialogOpen(false);
+        setRejectReason("");
       }
     }
   };
@@ -547,7 +546,7 @@ export default function BookingsPage() {
         </AlertDialogContent>
       </AlertDialog>
       {/* Reject Confirmation Dialog */}
-      <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+      <AlertDialog open={rejectDialogOpen} onOpenChange={(open)=>{ setRejectDialogOpen(open); if(!open) setRejectReason(""); }}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Konfirmasi Tolak Booking</AlertDialogTitle>
@@ -556,6 +555,16 @@ export default function BookingsPage() {
               {bookingToAction?.userName}?
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="px-1 pb-2 space-y-2">
+            <div className="text-xs text-gray-600">Alasan Penolakan</div>
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              className="rounded-xl"
+              placeholder="Tuliskan alasan penolakan (opsional)"
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
             <AlertDialogAction
@@ -683,7 +692,7 @@ export default function BookingsPage() {
                   <div className="text-sm text-gray-600">Total</div>
                   <div className="text-xl font-bold">
                     {formatCurrency(
-                      detailData.totalAmount ?? computeTotal(detailData.items)
+                      Number(detailData.totalAmount ?? computeTotal(detailData.items))
                     )}
                   </div>
                 </div>

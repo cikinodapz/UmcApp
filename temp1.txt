@@ -1,0 +1,121 @@
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPayment && (
+            <div className="space-y-6">
+              {/* Payment Details */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Booking</p>
+                    <p className="font-medium">{selectedPayment.bookingCode}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Jumlah</p>
+                    <p className="font-medium">
+                      {formatCurrency(selectedPayment.amount)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Metode</p>
+                    <p className="font-medium">{selectedPayment.method}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Status Saat Ini</p>
+                    <StatusBadge status={selectedPayment.status} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Proof Upload */}
+              {selectedPayment.status === PaymentStatus.PENDING && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="proof">Bukti Pembayaran</Label>
+                    <Input
+                      id="proof"
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) =>
+                        setProofFile(e.target.files?.[0] || null)
+                      }
+                      className="rounded-xl"
+                    />
+                  </div>
+
+                  {isAdmin && (
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status Baru</Label>
+                      <Select value={newStatus} onValueChange={setNewStatus}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem
+                            value={PaymentStatus.PENDING}
+                            className="rounded-lg"
+                          >
+                            Pending
+                          </SelectItem>
+                          <SelectItem
+                            value={PaymentStatus.PAID}
+                            className="rounded-lg"
+                          >
+                            Lunas
+                          </SelectItem>
+                          <SelectItem
+                            value={PaymentStatus.FAILED}
+                            className="rounded-lg"
+                          >
+                            Gagal
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Existing Proof */}
+              {selectedPayment.proofUrl && (
+                <div className="space-y-2">
+                  <Label>Bukti Pembayaran</Label>
+                  <div className="p-4 border rounded-xl">
+                    <p className="text-sm text-gray-600">
+                      File bukti pembayaran tersedia
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 rounded-lg bg-transparent"
+                    >
+                      Lihat Bukti
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPaymentDialogOpen(false)}
+              className="rounded-xl"
+            >
+              Tutup
+            </Button>
+            {selectedPayment?.status === PaymentStatus.PENDING && (
+              <Button
+                onClick={handleUpdatePayment}
+                className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
+              >
+                {isAdmin ? "Update Status" : "Upload Bukti"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

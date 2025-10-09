@@ -25,6 +25,7 @@ interface DataTableProps<T> {
   searchPlaceholder?: string
   pageSize?: number
   className?: string
+  renderHeader?: (ctx: { searchQuery: string; setSearchQuery: (v: string) => void }) => React.ReactNode
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -35,6 +36,7 @@ export function DataTable<T extends Record<string, any>>({
   searchPlaceholder = "Cari...",
   pageSize = 10,
   className,
+  renderHeader,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -87,25 +89,35 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <Card className={cn("rounded-2xl border-0 shadow-lg", className)}>
-      {(title || searchable) && (
+      {(title || searchable || renderHeader) && (
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            {title && <CardTitle className="text-xl font-bold">{title}</CardTitle>}
-            {searchable && (
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder={searchPlaceholder}
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="pl-10 rounded-xl border-2 focus:border-indigo-500"
-                />
-              </div>
-            )}
-          </div>
+          {renderHeader ? (
+            renderHeader({
+              searchQuery,
+              setSearchQuery: (v: string) => {
+                setSearchQuery(v)
+                setCurrentPage(1)
+              },
+            })
+          ) : (
+            <div className="flex items-center justify-between">
+              {title && <CardTitle className="text-xl font-bold">{title}</CardTitle>}
+              {searchable && (
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder={searchPlaceholder}
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="pl-10 rounded-xl border-2 focus:border-indigo-500"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </CardHeader>
       )}
       <CardContent className="p-0">
