@@ -20,9 +20,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { api, fetchData } from "@/lib/api";
-import { CreditCard, ExternalLink, RefreshCw, Eye } from "lucide-react";
+import { CreditCard, ExternalLink, RefreshCw, Eye, Star } from "lucide-react";
 import Image from "next/image";
 import { PaymentMethod, PaymentStatus } from "@/types";
+import { Textarea } from "@/components/ui/textarea";
+import Swal from "sweetalert2";
 
 type ApiUser = {
   id: string;
@@ -69,6 +71,14 @@ export default function RiwayatPembayaranPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [bookingDetail, setBookingDetail] = useState<any | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedback, setFeedback] = useState<any | null>(null);
+  const [ratingInput, setRatingInput] = useState<number>(5);
+  const [commentInput, setCommentInput] = useState<string>("");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackBookingId, setFeedbackBookingId] = useState<string | null>(null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let active = true;
@@ -103,6 +113,31 @@ export default function RiwayatPembayaranPage() {
     }));
     return mapped.filter((it) => statusFilter === "all" || it.status === statusFilter);
   }, [items, statusFilter]);
+
+  // Prefetch feedback availability for completed bookings to improve UX (hide button if already rated)
+  useEffect(() => {
+    const bids = Array.from(new Set(
+      (items || [])
+        .map((p) => p.booking?.id || p.bookingId)
+        .filter((id): id is string => !!id)
+    ));
+    const completed = items.filter((p) => p.booking?.status === 'SELESAI');
+    const targets = Array.from(new Set(completed.map((p) => p.booking?.id || p.bookingId).filter((id): id is string => !!id)));
+    (async () => {
+      for (const bid of targets) {
+        if (feedbackMap[bid]) continue;
+        try {
+          const fb = await fetchData(`/feedbacks/my/by-booking/${bid}`, { method: 'GET' });
+          if (fb?.feedback) {
+            setFeedbackMap((prev) => ({ ...prev, [bid]: true }));
+          }
+        } catch (_) {
+          // ignore errors
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   // Simple aggregate values if needed later (not rendered to keep UI minimal)
   const _aggregate = useMemo(() => ({
@@ -190,6 +225,28 @@ export default function RiwayatPembayaranPage() {
           >
             <Eye className="w-4 h-4" />
           </Button>
+
+          {row.booking?.status === 'SELESAI' && !feedbackMap[(row.booking?.id || row.bookingId) as string] && (
+            <Button
+              size="sm"
+              className="rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-sm"
+              onClick={() => openFeedbackForm(row)}
+              title="Beri feedback"
+            >
+              <Star className="w-4 h-4 mr-1 fill-white text-white" /> Feedback
+            </Button>
+          )}
+          {row.booking?.status === 'SELESAI' && feedbackMap[(row.booking?.id || row.bookingId) as string] && (
+            <button
+              type="button"
+              onClick={() => openFeedbackForm(row)}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-yellow-50 border border-yellow-200 hover:bg-yellow-100"
+              title="Lihat feedback yang sudah dikirim"
+              aria-label="Lihat feedback"
+            >
+              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -223,17 +280,108 @@ export default function RiwayatPembayaranPage() {
     setDetailOpen(true);
     setDetailLoading(true);
     setBookingDetail(null);
+    setFeedback(null);
     try {
       // Fetch payment detail (includes booking + items)
       const detail = await fetchData(`/payments/${p.id}`, { method: "GET" });
       // Update selected to latest server state
       setSelected(detail);
       setBookingDetail(detail?.booking || null);
+      // Load feedback milik user untuk booking terkait
+      const bid = detail?.booking?.id || p.bookingId;
+      if (bid) {
+        setFeedbackLoading(true);
+        try {
+          const fb = await fetchData(`/feedbacks/my/by-booking/${bid}`, { method: "GET" });
+          setFeedback(fb?.feedback || null);
+          if (fb?.feedback) {
+            setRatingInput(Number(fb.feedback.rating) || 5);
+            setCommentInput(String(fb.feedback.comment || ""));
+          } else {
+            setRatingInput(5);
+            setCommentInput("");
+          }
+        } catch (e) {
+          setFeedback(null);
+        } finally {
+          setFeedbackLoading(false);
+        }
+      }
     } catch (e: any) {
       // keep dialog open, but show minimal info
       setBookingDetail(null);
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function openFeedbackForm(p: ApiPayment) {
+    try {
+      const bid = p.booking?.id || p.bookingId;
+      if (!bid) return;
+      setFeedbackBookingId(bid);
+      setFeedbackOpen(true);
+      setFeedbackLoading(true);
+      setRatingInput(5);
+      setCommentInput("");
+      const fb = await fetchData(`/feedbacks/my/by-booking/${bid}`, { method: "GET" });
+      if (fb?.feedback) {
+        setFeedback(fb.feedback);
+        setRatingInput(Number(fb.feedback.rating) || 5);
+        setCommentInput(String(fb.feedback.comment || ""));
+      } else {
+        setFeedback(null);
+      }
+    } catch (e) {
+      setFeedback(null);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
+  async function submitFeedbackFromPopup() {
+    if (!feedbackBookingId) return;
+    try {
+      if (!ratingInput || ratingInput < 1 || ratingInput > 5) {
+        await Swal.fire({ icon: "warning", title: "Rating tidak valid", text: "Pilih rating 1-5" });
+        return;
+      }
+      setFeedbackSubmitting(true);
+      await fetchData(`/feedbacks`, {
+        method: "POST",
+        data: { bookingId: feedbackBookingId, rating: ratingInput, comment: commentInput },
+      });
+      await Swal.fire({ icon: "success", title: "Terima kasih", text: "Feedback terkirim", timer: 1400, showConfirmButton: false });
+      setFeedbackMap((prev) => ({ ...prev, [feedbackBookingId]: true }));
+      setFeedbackOpen(false);
+    } catch (e: any) {
+      await Swal.fire({ icon: "error", title: "Gagal", text: e?.message || "Tidak dapat mengirim feedback" });
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  }
+
+  async function submitFeedback() {
+    if (!bookingDetail?.id) return;
+    try {
+      if (!ratingInput || ratingInput < 1 || ratingInput > 5) {
+        await Swal.fire({ icon: "warning", title: "Rating tidak valid", text: "Pilih rating 1-5" });
+        return;
+      }
+      await fetchData(`/feedbacks`, {
+        method: "POST",
+        data: {
+          bookingId: bookingDetail.id,
+          rating: ratingInput,
+          comment: commentInput,
+        },
+      });
+      await Swal.fire({ icon: "success", title: "Terima kasih", text: "Feedback terkirim", timer: 1400, showConfirmButton: false });
+      // reload feedback
+      const fb = await fetchData(`/feedbacks/my/by-booking/${bookingDetail.id}`, { method: "GET" });
+      setFeedback(fb?.feedback || null);
+    } catch (e: any) {
+      await Swal.fire({ icon: "error", title: "Gagal", text: e?.message || "Tidak dapat mengirim feedback" });
     }
   }
 
@@ -296,6 +444,61 @@ export default function RiwayatPembayaranPage() {
           )}
         />
       )}
+
+      {/* Feedback Popup */}
+      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+        <DialogContent className="rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Beri Feedback</DialogTitle>
+            <DialogDescription>Bagikan pengalamanmu untuk booking ini.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {feedbackLoading ? (
+              <div className="text-sm text-muted-foreground">Memuat...</div>
+            ) : feedback ? (
+              <div className="p-4 rounded-xl border bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="rounded-md">Rating: {feedback.rating}/5</Badge>
+                  <div className="text-xs text-gray-500">{formatDateTime(feedback.createdAt)}</div>
+                </div>
+                <div className="mt-2 text-sm whitespace-pre-wrap">{feedback.comment || "(Tanpa komentar)"}</div>
+                <div className="mt-3 text-xs text-gray-500">Feedback sudah dikirim. Terima kasih!</div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">Rating</div>
+                  <div className="flex items-center gap-1">
+                    {[1,2,3,4,5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setRatingInput(n)}
+                        className="p-1.5 rounded-md hover:bg-yellow-50"
+                        aria-label={`Rating ${n}`}
+                      >
+                        <Star className={n <= ratingInput ? 'w-6 h-6 text-yellow-500 fill-yellow-500' : 'w-6 h-6 text-gray-300'} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600 mb-1">Komentar (opsional)</div>
+                  <Textarea rows={4} value={commentInput} onChange={(e)=> setCommentInput(e.target.value)} className="rounded-lg" placeholder="Tulis pengalaman kamu..." />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setFeedbackOpen(false)}>Batal</Button>
+            {!feedback && (
+              <Button onClick={submitFeedbackFromPopup} disabled={feedbackSubmitting} className="rounded-xl">
+                {feedbackSubmitting ? 'Mengirim...' : 'Kirim Feedback'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="sm:max-w-[520px] rounded-2xl">
@@ -395,6 +598,7 @@ export default function RiwayatPembayaranPage() {
                   <div className="text-sm text-muted-foreground">Tidak ada item pesanan untuk booking ini.</div>
                 )}
               </div>
+
 
               {selected.proofUrl && (
                 <div>

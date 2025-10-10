@@ -17,16 +17,22 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Package2,
+  LogOut,
 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { fetchData } from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
 
 const adminMenuItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Layanan", href: "/layanan", icon: Package }, 
   {
     title: "Inventaris",
-    icon: Package,
+    icon: Package2,
     children: [
       { title: "Kelola Kategori", href: "/inventory/categories" },
       { title: "Kelola Aset & Jasa", href: "/inventory/assets-services" },
@@ -34,18 +40,18 @@ const adminMenuItems = [
   },
   { title: "Pemesanan", href: "/pemesanan", icon: Calendar },
   { title: "Pembayaran", href: "/payments", icon: CreditCard },
-  { title: "Pengembalian", href: "/returns", icon: RotateCcw },
-  { title: "Denda", href: "/fines", icon: AlertTriangle },
+  // { title: "Pengembalian", href: "/returns", icon: RotateCcw },
+  // { title: "Denda", href: "/fines", icon: AlertTriangle },
   { title: "Feedback", href: "/feedback", icon: MessageSquare },
   { title: "Notifikasi", href: "/notifications", icon: Bell },
-  {
-    title: "Pengaturan",
-    icon: Settings,
-    children: [
-      { title: "Profil", href: "/settings/profile" },
-      { title: "Kategori", href: "/settings/categories" },
-    ],
-  },
+  // {
+  //   title: "Pengaturan",
+  //   icon: Settings,
+  //   children: [
+  //     { title: "Profil", href: "/settings/profile" },
+  //     { title: "Kategori", href: "/settings/categories" },
+  //   ],
+  // },
 ];
 
 interface AppSidebarProps {
@@ -55,6 +61,9 @@ interface AppSidebarProps {
 export function AppSidebar({ className }: AppSidebarProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const { logout } = useAuth();
+  const router = useRouter();
 
   // track buka/tutup submenu
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
@@ -62,6 +71,31 @@ export function AppSidebar({ className }: AppSidebarProps) {
   const toggleMenu = (title: string) => {
     setOpenMenus((prev) => ({ ...prev, [title]: !prev[title] }));
   };
+
+  // Load unread notification count for admin
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const data = await fetchData("/notifications", { method: "GET" });
+        const list: any[] = Array.isArray((data as any)?.notifications)
+          ? (data as any).notifications
+          : Array.isArray(data)
+          ? (data as any)
+          : [];
+        const count = list.filter((n: any) => !n.readAt).length;
+        if (active) setUnreadCount(count);
+      } catch {
+        if (active) setUnreadCount(0);
+      }
+    }
+    load();
+    const t = setInterval(load, 30000);
+    return () => {
+      active = false;
+      clearInterval(t);
+    };
+  }, []);
 
   return (
     <div
@@ -207,8 +241,15 @@ export function AppSidebar({ className }: AppSidebarProps) {
                     : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 )}
               >
-                <Link href={item.href!}>
-                  <Icon className="w-6 h-6 shrink-0" />
+                <Link href={item.href!} className="relative flex items-center gap-3">
+                  <span className="relative inline-flex">
+                    <Icon className="w-6 h-6 shrink-0" />
+                    {item.href === "/notifications" && unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 inline-flex items-center justify-center text-[10px] leading-none h-4 min-w-[16px] px-1 rounded-full bg-red-600 text-white border border-white">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </span>
                   {!isCollapsed && <span>{item.title}</span>}
                 </Link>
               </Button>
@@ -216,6 +257,42 @@ export function AppSidebar({ className }: AppSidebarProps) {
           })}
         </nav>
       </ScrollArea>
+
+      {/* Footer: Logout */}
+      <div className="border-t border-gray-200 p-3">
+        <Button
+          variant="ghost"
+          className={cn(
+            "w-full justify-start gap-3 h-11 rounded-xl font-medium text-[14px] text-red-600 hover:bg-red-50 hover:text-red-700",
+            isCollapsed ? "px-0 justify-center" : ""
+          )}
+          onClick={async () => {
+            const res = await Swal.fire({
+              icon: "question",
+              title: "Keluar dari Admin?",
+              text: "Anda akan keluar dari sesi saat ini.",
+              showCancelButton: true,
+              confirmButtonText: "Ya, keluar",
+              cancelButtonText: "Batal",
+              confirmButtonColor: "#ef4444",
+            })
+            if (res.isConfirmed) {
+              try { localStorage.removeItem("token") } catch {}
+              logout()
+              await Swal.fire({
+                icon: "success",
+                title: "Berhasil keluar",
+                timer: 1200,
+                showConfirmButton: false,
+              })
+              router.push("/auth/login")
+            }
+          }}
+        >
+          <LogOut className="w-5 h-5" />
+          {!isCollapsed && <span>Keluar</span>}
+        </Button>
+      </div>
     </div>
   );
 }

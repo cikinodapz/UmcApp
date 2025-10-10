@@ -314,7 +314,7 @@ export default function BookingPage() {
                           {payingId === b.id ? 'Memproses...' : 'Bayar'}
                         </Button>
                       ) : null}
-                      {b.status !== 'DIKONFIRMASI' && b.status !== 'DIBATALKAN' ? (
+                      {b.status === 'MENUNGGU' ? (
                         <Button
                           variant="destructive"
                           size="sm"

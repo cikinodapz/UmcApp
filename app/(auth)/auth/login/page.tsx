@@ -110,6 +110,19 @@ export default function LoginPage() {
     if (response?.token) {
       localStorage.setItem("token", response.token)
     }
+    // Fetch user profile and persist for AuthProvider
+    try {
+      const me = await fetchData("/auth/me", {
+        method: "GET",
+        headers: response?.token ? { Authorization: `Bearer ${response.token}` } : undefined,
+      })
+      const userObj = me?.user || me
+      if (userObj) {
+        localStorage.setItem("umcmediahub-user", JSON.stringify(userObj))
+      }
+    } catch {
+      // ignore, fallback to role-only
+    }
     const role = await resolveRole(response, response?.token)
     if (role) localStorage.setItem("role", role)
 
