@@ -4,10 +4,21 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Home, Package, Calendar, CreditCard, RotateCcw, MessageSquare, Bell, User, Menu, X, ShoppingCart, TimerIcon, Timer, HandCoins, Clock } from "lucide-react"
+import { Home, Package, Calendar, CreditCard, RotateCcw, MessageSquare, Bell, User, Menu, X, ShoppingCart, TimerIcon, Timer, HandCoins, Clock, LogOut } from "lucide-react"
 import Image from "next/image"
 import { title } from "process"
 import { fetchData } from "@/lib/api"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useEffect as ReactUseEffect, useState as ReactUseState } from "react"
 
 const peminjamMenuItems = [
   {
@@ -55,17 +66,36 @@ const peminjamMenuItems = [
     href: "/notifikasi",
     icon: Bell,
   },
-  {
-    title: "Profil",
-    href: "/settings/profile",
-    icon: User,
-  },
+  // {
+  //   title: "Profil",
+  //   href: "/profile",
+  //   icon: User,
+  // },
 ]
 
 export function PeminjamNavbar() {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState<number>(0)
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const [navUser, setNavUser] = ReactUseState<{ name?: string; email?: string; photoUrl?: string } | null>(null)
+
+  const userPhoto = (p?: string | null) => {
+    if (!p) return "/avatar.png"
+    if (/^https?:\/\//i.test(p)) return p
+    const base = process.env.NEXT_PUBLIC_API_URL || ""
+    const path = p.startsWith("/uploads/") ? p : `/uploads/${p}`
+    return `${base}${path}`
+  }
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('token')
+    } catch {}
+    logout()
+    router.push('/auth/login')
+  }
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -88,6 +118,22 @@ export function PeminjamNavbar() {
     const t = setInterval(load, 30000)
     return () => { active = false; clearInterval(t) }
   }, [])
+
+  // Fetch latest user profile like profile/page.tsx
+  useEffect(() => {
+    let mounted = true
+    async function loadMe() {
+      try {
+        const resp = await fetchData("/auth/me")
+        const u = resp?.user || resp
+        if (mounted) setNavUser({ name: u?.name, email: u?.email, photoUrl: u?.photoUrl })
+      } catch {
+        if (mounted) setNavUser({ name: user?.name, email: user?.email, photoUrl: (user as any)?.photoUrl })
+      }
+    }
+    loadMe()
+    return () => { mounted = false }
+  }, [user])
   
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
@@ -148,6 +194,40 @@ export function PeminjamNavbar() {
             })}
           </div>
 
+          {/* Desktop: User Profile */}
+          <div className="hidden md:flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="w-9 h-9 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                    <img src={userPhoto(navUser?.photoUrl || user?.photoUrl || null)} alt="Profile" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="leading-tight text-left">
+                    <div className="text-sm font-medium text-gray-900 truncate max-w-[160px]">{navUser?.name || user?.name || "Pengguna"}</div>
+                    <div className="text-xs text-gray-500 truncate max-w-[200px]">{navUser?.email || user?.email || "-"}</div>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 rounded-xl" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{navUser?.name || user?.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{navUser?.email || user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="rounded-lg" asChild>
+                  <Link href="/profile">Profil</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="rounded-lg text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Keluar</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           {/* Mobile Menu Button */}
           <div className="md:hidden">
             <Button
@@ -169,6 +249,17 @@ export function PeminjamNavbar() {
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4">
+            {/* Mobile: User Profile Summary */}
+            <div className="flex items-center gap-3 px-3 py-3 mb-3 rounded-xl bg-gray-50 border border-gray-200">
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-gray-200 bg-white">
+                <img src={userPhoto(navUser?.photoUrl || user?.photoUrl || null)} alt="Profile" className="w-full h-full object-cover" />
+              </div>
+              <div className="leading-tight">
+                <div className="text-sm font-semibold text-gray-900">{navUser?.name || user?.name || "Pengguna"}</div>
+                <div className="text-xs text-gray-600">{navUser?.email || user?.email || "-"}</div>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-2">
               {peminjamMenuItems.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
