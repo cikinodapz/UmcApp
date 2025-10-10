@@ -1,12 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
 import { fetchData } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
-import { Button } from "@/components/ui/button"
-import Swal from 'sweetalert2'
-import { Pencil } from "lucide-react"
 
 type ApiUser = {
   id: string
@@ -22,7 +18,6 @@ type ApiUser = {
 
 export default function ProfilePage() {
   const { toast } = useToast()
-  const router = useRouter()
   const [user, setUser] = useState<ApiUser | null>(null)
   const [loading, setLoading] = useState(false)
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -73,25 +68,8 @@ export default function ProfilePage() {
   }
 
   const changePassword = async () => {
-    // Basic validations with SweetAlert2 feedback
-    if (!pwd.currentPassword) {
-      await Swal.fire({ icon: 'warning', title: 'Validasi', text: 'Password saat ini wajib diisi.' })
-      return
-    }
-    if (!pwd.newPassword) {
-      await Swal.fire({ icon: 'warning', title: 'Validasi', text: 'Password baru wajib diisi.' })
-      return
-    }
-    if (pwd.newPassword.length < 6) {
-      await Swal.fire({ icon: 'warning', title: 'Validasi', text: 'Password baru minimal 6 karakter.' })
-      return
-    }
-    if (pwd.newPassword === pwd.currentPassword) {
-      await Swal.fire({ icon: 'warning', title: 'Validasi', text: 'Password baru tidak boleh sama dengan password saat ini.' })
-      return
-    }
     if (pwd.newPassword !== pwd.confirmPassword) {
-      await Swal.fire({ icon: 'warning', title: 'Validasi', text: 'Konfirmasi password tidak cocok.' })
+      toast({ title: "Error", description: "Password baru tidak cocok", variant: "destructive" })
       return
     }
     try {
@@ -100,23 +78,11 @@ export default function ProfilePage() {
         method: "PATCH",
         data: { oldPassword: pwd.currentPassword, newPassword: pwd.newPassword },
       })
+      toast({ title: "Berhasil", description: "Password berhasil diubah" })
       setPwd({ currentPassword: "", newPassword: "", confirmPassword: "" })
-      await Swal.fire({
-        icon: 'success',
-        title: 'Berhasil',
-        text: 'Password berhasil diubah. Silakan login kembali.',
-        confirmButtonText: 'OK'
-      })
-      try {
-        localStorage.removeItem('token')
-        localStorage.removeItem('umcmediahub-user')
-      } catch {}
-      router.replace('/auth/login')
     } catch (e: any) {
-      const msg = e?.message || 'Coba lagi'
-      await Swal.fire({ icon: 'error', title: 'Gagal mengubah password', text: msg })
-      toast({ title: "Gagal mengubah password", description: msg, variant: "destructive" })
-      } finally {
+      toast({ title: "Gagal mengubah password", description: e?.message || "Coba lagi", variant: "destructive" })
+    } finally {
       setLoading(false)
     }
   }
@@ -132,48 +98,33 @@ export default function ProfilePage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Informasi Profil</h2>
+            <button
+              onClick={pickPhoto}
+              disabled={photoUploading}
+              className="px-4 py-2 bg-gray-100 text-gray-900 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-60"
+            >
+              {photoUploading ? "Mengunggah..." : "Ubah Foto"}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => uploadPhoto(e.target.files?.[0] || undefined)}
+            />
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => uploadPhoto(e.target.files?.[0] || undefined)}
-          />
 
           <div className="flex items-center mb-6">
-            <div className="relative">
-              <div className="p-[2px] rounded-full bg-gradient-to-r from-indigo-500 to-violet-600">
-                <div className="rounded-full bg-white">
-                  {user?.photoUrl ? (
-                    <img
-                      src={user.photoUrl}
-                      alt="Foto Profil"
-                      className="w-20 h-20 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                      {initials(user?.name)}
-                    </div>
-                  )}
-                </div>
+            {user?.photoUrl ? (
+              <img src={user.photoUrl} alt="Foto Profil" className="w-16 h-16 rounded-2xl object-cover border" />
+            ) : (
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold">
+                {initials(user?.name)}
               </div>
-              <button
-                type="button"
-                onClick={pickPhoto}
-                disabled={photoUploading}
-                className="absolute -bottom-1 -right-1 rounded-full p-[2px] bg-gradient-to-r from-indigo-500 to-violet-600 shadow-sm disabled:opacity-60"
-                aria-label="Ubah foto"
-                title="Ubah foto"
-              >
-                <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:bg-gray-50">
-                  <Pencil className="w-4 h-4 text-indigo-600" />
-                </span>
-              </button>
-            </div>
+            )}
             <div className="ml-4">
               <h3 className="text-lg font-semibold text-gray-900">{user?.name || (loading ? "Memuat..." : "-")}</h3>
-              <p className="text-gray-600">{user?.email || "-"}</p>
+              <p className="text-gray-600 capitalize">{user?.role || "peminjam"}</p>
             </div>
           </div>
 
@@ -211,16 +162,13 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <Button
-            onClick={changePassword}
-            disabled={loading}
-            size="lg"
-            className="w-full mt-8 h-12 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
-          >
+          <button onClick={changePassword} disabled={loading} className="w-full mt-6 px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60">
             {loading ? "Memproses..." : "Ubah Password"}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
   )
 }
+
+

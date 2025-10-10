@@ -23,7 +23,7 @@ import {
 import { DataTable } from "@/components/data-table";
 import { useAuth } from "@/contexts/auth-context";
 import { BookingStatus, Role } from "@/types";
-import { formatDateTime } from "@/lib/format";
+import { formatCurrency, formatDateTime } from "@/lib/format";
 import { fetchData } from "@/lib/api";
 import { Star, MessageSquare, Edit, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -98,6 +98,8 @@ export default function FeedbackPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   // view-only dialog
   const [selected, setSelected] = useState<FeedbackRow | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailBooking, setDetailBooking] = useState<any | null>(null);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -217,7 +219,7 @@ export default function FeedbackPage() {
             variant="ghost"
             size="sm"
             className="rounded-lg"
-            onClick={() => { setSelected(row); setDialogOpen(true); }}
+            onClick={() => openDetail(row)}
           >
             <Eye className="w-4 h-4" />
           </Button>
@@ -272,6 +274,28 @@ export default function FeedbackPage() {
     setDialogOpen(false);
     resetForm();
   };
+
+  const paged = useMemo(
+    () => tableData.slice((page - 1) * pageSize, page * pageSize),
+    [tableData, page, pageSize]
+  );
+
+  async function openDetail(row: FeedbackRow) {
+    setSelected(row);
+    setDialogOpen(true);
+    setDetailLoading(true);
+    setDetailBooking(null);
+    try {
+      const data = await fetchData(`/feedbacks/by-booking/${row.bookingId}`, { method: 'GET' });
+      const arr = Array.isArray(data) ? data : [];
+      const first = arr[0];
+      setDetailBooking(first?.booking || null);
+    } catch (e) {
+      setDetailBooking(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   return (
     <div className="space-y-6 md:-ml-24">
@@ -337,23 +361,20 @@ export default function FeedbackPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border overflow-hidden">
-        <div className="p-4">
-          {error ? (
-            <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl">{error}</div>
-          ) : (
-            <DataTable
-              data={loading ? [] : tableData.slice((page - 1) * pageSize, page * pageSize)}
-              columns={columns}
-              searchPlaceholder="Cari feedback..."
-              pageSize={pageSize}
-            />
-          )}
-        </div>
-      </div>
+      {/* Table (single card, no nested header/search) */}
+      {error ? (
+        <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl">{error}</div>
+      ) : (
+        <DataTable
+          data={loading ? [] : paged}
+          columns={columns}
+          searchable={false}
+          pageSize={10}
+          className="rounded-2xl border shadow-sm overflow-hidden"
+        />
+      )}
 
-      {/* Pagination ala payments */}
+      {/* Pagination (eksternal, agar tidak dobel card) */}
       <div className="flex items-center justify-between px-1 py-2">
         <div className="text-sm text-gray-600">
           Menampilkan <span className="font-medium">{tableData.length === 0 ? 0 : (page - 1) * pageSize + 1}</span>
@@ -379,7 +400,9 @@ export default function FeedbackPage() {
               if (s > 1) out.push(1); if (s > 2) out.push('...');
               for (let p = s; p <= e; p++) out.push(p);
               if (e < totalPages - 1) out.push('...'); if (e < totalPages) out.push(totalPages);
-              return out.map((p, i) => typeof p === 'string' ? (<span key={`ellipsis-${i}`} className="px-2 text-sm text-gray-500">{p}</span>) : (
+              return out.map((p, i) => typeof p === 'string' ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-sm text-gray-500">{p}</span>
+              ) : (
                 <Button key={p} variant={p === page ? 'default' : 'outline'} size="sm" className={p === page ? 'rounded-xl bg-indigo-600' : 'rounded-xl'} onClick={() => setPage(p)}>{p}</Button>
               ));
             })()}
@@ -419,6 +442,37 @@ export default function FeedbackPage() {
               <div>
                 <p className="text-gray-500 text-sm mb-1">Komentar</p>
                 <p className="text-sm">{selected.comment || "-"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Detail Pesanan</p>
+                {detailLoading ? (
+                  <div className="text-sm text-muted-foreground">Memuat detail pesanan...</div>
+                ) : detailBooking?.items && detailBooking.items.length > 0 ? (
+                  <div className="divide-y rounded-xl border">
+                    {detailBooking.items.map((it: any) => {
+                      const qty = Number(it.quantity ?? it.qty ?? 0);
+                      const unit = Number(it.unitPrice ?? it.price ?? 0);
+                      const subtotal = Number(it.subtotal ?? qty * unit);
+                      const name = it?.service?.name || it?.asset?.name || (it.type || it.itemType);
+                      return (
+                        <div key={it.id} className="px-4 py-3 flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate" title={name}>{name}</div>
+                            <div className="text-xs text-gray-500">Qty {qty} × {formatCurrency(unit)}</div>
+                          </div>
+                          <div className="font-semibold whitespace-nowrap">{formatCurrency(subtotal)}</div>
+                        </div>
+                      );
+                    })}
+                    <div className="px-4 py-3 flex items-center justify-end gap-6 bg-gray-50">
+                      <div className="text-sm text-gray-600">Total</div>
+                      <div className="text-base font-bold">{formatCurrency(Number(detailBooking.totalAmount || 0))}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">Tidak ada item pesanan.</div>
+                )}
               </div>
             </div>
           )}
