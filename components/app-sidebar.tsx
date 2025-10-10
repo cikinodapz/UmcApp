@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Package2,
 } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
@@ -26,7 +27,7 @@ const adminMenuItems = [
   { title: "Layanan", href: "/layanan", icon: Package }, 
   {
     title: "Inventaris",
-    icon: Package,
+    icon: Package2,
     children: [
       { title: "Kelola Kategori", href: "/inventory/categories" },
       { title: "Kelola Aset & Jasa", href: "/inventory/assets-services" },
@@ -34,18 +35,18 @@ const adminMenuItems = [
   },
   { title: "Pemesanan", href: "/pemesanan", icon: Calendar },
   { title: "Pembayaran", href: "/payments", icon: CreditCard },
-  { title: "Pengembalian", href: "/returns", icon: RotateCcw },
-  { title: "Denda", href: "/fines", icon: AlertTriangle },
+  // { title: "Pengembalian", href: "/returns", icon: RotateCcw },
+  // { title: "Denda", href: "/fines", icon: AlertTriangle },
   { title: "Feedback", href: "/feedback", icon: MessageSquare },
   { title: "Notifikasi", href: "/notifications", icon: Bell },
-  {
-    title: "Pengaturan",
-    icon: Settings,
-    children: [
-      { title: "Profil", href: "/settings/profile" },
-      { title: "Kategori", href: "/settings/categories" },
-    ],
-  },
+  // {
+  //   title: "Pengaturan",
+  //   icon: Settings,
+  //   children: [
+  //     { title: "Profil", href: "/settings/profile" },
+  //     { title: "Kategori", href: "/settings/categories" },
+  //   ],
+  // },
 ];
 
 interface AppSidebarProps {

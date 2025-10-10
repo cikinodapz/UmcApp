@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -22,44 +22,13 @@ import {
 } from "@/components/ui/dialog";
 import { DataTable } from "@/components/data-table";
 import { useAuth } from "@/contexts/auth-context";
-import { mockBookings, mockUsers } from "@/lib/mock";
 import { BookingStatus, Role } from "@/types";
 import { formatDateTime } from "@/lib/format";
+import { fetchData } from "@/lib/api";
 import { Star, MessageSquare, Edit, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// ===== Dummy feedback seeding (ambil 3–5 booking yang SELESAI) =====
-const sampleComments = [
-  "Pelayanan cepat dan ramah. Terima ya!",
-  "Peralatan lengkap, hasilnya memuaskan.",
-  "Sedikit terlambat saat pengambilan, tapi overall oke.",
-  "Admin responsif, proses mudah.",
-  "Kualitas audio mantap. Recommended!",
-];
-
-function seedFeedbacks(): FeedbackRow[] {
-  const done = mockBookings.filter((b) => b.status === BookingStatus.SELESAI);
-  const picked = (done.length ? done : mockBookings).slice(
-    0,
-    Math.min(5, done.length || 3)
-  );
-
-  return picked.map((b, i) => {
-    const u = mockUsers.find((uu) => uu.id === b.userId);
-    const rating = [5, 4, 5, 3, 4][i % 5];
-    return {
-      id: crypto.randomUUID(),
-      bookingId: b.id,
-      userId: u?.id || "user-seed",
-      userName: u?.name || "Pengguna Demo",
-      userEmail: u?.email || "demo@umc.ac.id",
-      rating,
-      comment: sampleComments[i % sampleComments.length],
-      createdAt: new Date(Date.now() - (i + 1) * 36e5).toISOString(), // mundur per 1 jam
-      bookingCode: b.id.slice(-8),
-    };
-  });
-}
+// Data type row ditabel
 
 type FeedbackRow = {
   id: string;
@@ -117,8 +86,9 @@ export default function FeedbackPage() {
   const { toast } = useToast();
   const isAdmin = user?.role === Role.ADMIN;
 
-  // ====== Local state as mock "DB" ======
-  const [feedbacks, setFeedbacks] = useState<FeedbackRow[]>(seedFeedbacks());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [feedbacks, setFeedbacks] = useState<FeedbackRow[]>([]);
 
   // Filter & derived data
   const [ratingFilter, setRatingFilter] = useState<string>("all");
@@ -126,47 +96,43 @@ export default function FeedbackPage() {
 
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"create" | "edit" | "view">(
-    "create"
-  );
+  // view-only dialog
   const [selected, setSelected] = useState<FeedbackRow | null>(null);
 
-  // Form states
-  const [selectedBookingId, setSelectedBookingId] = useState<string>("");
-  const [formRating, setFormRating] = useState<number>(5);
-  const [formComment, setFormComment] = useState<string>("");
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Bookings yang SELESAI
-  const completedBookings = useMemo(
-    () =>
-      mockBookings
-        .filter((b) => b.status === BookingStatus.SELESAI)
-        .filter((b) => (isAdmin ? true : b.userId === user?.id)),
-    [isAdmin, user?.id]
-  );
-
-  // Booking yang belum punya feedback oleh user aktif
-  const selectableBookings = useMemo(() => {
-    const owned = completedBookings.filter((b) => b.userId === user?.id);
-    const already = new Set(
-      feedbacks.filter((f) => f.userId === user?.id).map((f) => f.bookingId)
-    );
-    return owned.filter((b) => !already.has(b.id));
-  }, [completedBookings, feedbacks, user?.id]);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchData('/feedbacks/admin/all');
+        const arr = Array.isArray(data) ? data : [];
+        setFeedbacks(arr.map((f: any) => ({
+          id: f.id,
+          bookingId: f.bookingId,
+          userId: f.userId,
+          userName: f.user?.name || '-',
+          userEmail: f.user?.email || '',
+          rating: Number(f.rating || 0),
+          comment: f.comment || '',
+          createdAt: f.createdAt,
+          bookingCode: (f.booking?.id || f.bookingId || '').slice(-8),
+        })));
+      } catch (e: any) {
+        setError(e?.message || 'Gagal memuat feedback');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   // Data untuk tabel (join user & booking)
   const tableData: FeedbackRow[] = useMemo(() => {
-    const base = feedbacks.map((f) => {
-      const bk = mockBookings.find((b) => b.id === f.bookingId);
-      const u = mockUsers.find((uu) => uu.id === f.userId);
-      return {
-        ...f,
-        bookingCode: bk ? bk.id.slice(-8) : "Unknown",
-        userName: u?.name ?? "Unknown",
-        userEmail: u?.email ?? "",
-      };
-    });
-    const scoped = isAdmin ? base : base.filter((f) => f.userId === user?.id);
+    const base = feedbacks;
+    const scoped = base; // admin page: tampilkan semua
     const rated =
       ratingFilter === "all"
         ? scoped
@@ -187,13 +153,13 @@ export default function FeedbackPage() {
   }, [feedbacks, isAdmin, ratingFilter, search, user?.id]);
 
   const averageRating = useMemo(() => {
-    if (feedbacks.length === 0) return 0;
+    if (tableData.length === 0) return 0;
     return (
       Math.round(
-        (feedbacks.reduce((s, f) => s + f.rating, 0) / feedbacks.length) * 10
+        (tableData.reduce((s, f) => s + f.rating, 0) / tableData.length) * 10
       ) / 10
     );
-  }, [feedbacks]);
+  }, [tableData]);
 
   // ====== Columns ======
   const columns = [
@@ -251,51 +217,11 @@ export default function FeedbackPage() {
             variant="ghost"
             size="sm"
             className="rounded-lg"
-            onClick={() => {
-              setSelected(row);
-              setViewMode("view");
-              setDialogOpen(true);
-            }}
+            onClick={() => { setSelected(row); setDialogOpen(true); }}
           >
             <Eye className="w-4 h-4" />
           </Button>
 
-          {/* Edit hanya pemilik atau admin */}
-          {/* {(isAdmin || row.userId === user?.id) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-lg"
-              onClick={() => {
-                setSelected(row);
-                setSelectedBookingId(row.bookingId);
-                setFormRating(row.rating);
-                setFormComment(row.comment ?? "");
-                setViewMode("edit");
-                setDialogOpen(true);
-              }}
-            >
-              <Edit className="w-4 h-4" />
-            </Button>
-          )} */}
-
-          {/* Hapus hanya admin atau pemilik */}
-          {(isAdmin || row.userId === user?.id) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-lg text-red-600 hover:text-red-700"
-              onClick={() => {
-                setFeedbacks((prev) => prev.filter((f) => f.id !== row.id));
-                toast({
-                  title: "Dihapus",
-                  description: "Feedback berhasil dihapus",
-                });
-              }}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          )}
         </div>
       ),
     },
@@ -348,7 +274,7 @@ export default function FeedbackPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 md:-ml-24">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -359,21 +285,7 @@ export default function FeedbackPage() {
               : "Berikan pengalaman Anda terhadap layanan kami"}
           </p>
         </div>
-        {/* Tombol tambah hanya untuk user biasa (punya booking selesai yang belum dinilai) */}
-        {!isAdmin && (
-          <Button
-            className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
-            disabled={selectableBookings.length === 0}
-            onClick={() => {
-              resetForm();
-              setViewMode("create");
-              setDialogOpen(true);
-            }}
-          >
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Beri Feedback
-          </Button>
-        )}
+        
       </div>
 
       {/* Summary */}
@@ -426,35 +338,67 @@ export default function FeedbackPage() {
       </div>
 
       {/* Table */}
-      <DataTable
-        data={tableData}
-        columns={columns}
-        searchPlaceholder="Cari feedback..."
-        pageSize={10}
-      />
+      <div className="bg-white rounded-2xl border overflow-hidden">
+        <div className="p-4">
+          {error ? (
+            <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl">{error}</div>
+          ) : (
+            <DataTable
+              data={loading ? [] : tableData.slice((page - 1) * pageSize, page * pageSize)}
+              columns={columns}
+              searchPlaceholder="Cari feedback..."
+              pageSize={pageSize}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Pagination ala payments */}
+      <div className="flex items-center justify-between px-1 py-2">
+        <div className="text-sm text-gray-600">
+          Menampilkan <span className="font-medium">{tableData.length === 0 ? 0 : (page - 1) * pageSize + 1}</span>
+          {" - "}
+          <span className="font-medium">{Math.min(page * pageSize, tableData.length)}</span>
+          {" dari "}
+          <span className="font-medium">{tableData.length}</span> data
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Rows</span>
+            <select className="h-9 rounded-xl border px-3 text-sm" value={pageSize} onChange={(e)=> { setPageSize(Number(e.target.value)); setPage(1); }}>
+              {[5,10,20,50].map(n => (<option key={n} value={n}>{n}</option>))}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(1)} disabled={page <= 1}>«</Button>
+            <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>‹</Button>
+            {(() => {
+              const totalPages = Math.max(1, Math.ceil(tableData.length / pageSize));
+              const span = 2; const out: (number | string)[] = [];
+              const s = Math.max(1, page - span); const e = Math.min(totalPages, page + span);
+              if (s > 1) out.push(1); if (s > 2) out.push('...');
+              for (let p = s; p <= e; p++) out.push(p);
+              if (e < totalPages - 1) out.push('...'); if (e < totalPages) out.push(totalPages);
+              return out.map((p, i) => typeof p === 'string' ? (<span key={`ellipsis-${i}`} className="px-2 text-sm text-gray-500">{p}</span>) : (
+                <Button key={p} variant={p === page ? 'default' : 'outline'} size="sm" className={p === page ? 'rounded-xl bg-indigo-600' : 'rounded-xl'} onClick={() => setPage(p)}>{p}</Button>
+              ));
+            })()}
+            <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(p => Math.min(Math.max(1, Math.ceil(tableData.length / pageSize)), p + 1))} disabled={page >= Math.max(1, Math.ceil(tableData.length / pageSize))}>›</Button>
+            <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(Math.max(1, Math.ceil(tableData.length / pageSize)))} disabled={page >= Math.max(1, Math.ceil(tableData.length / pageSize))}>»</Button>
+          </div>
+        </div>
+      </div>
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[520px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {viewMode === "create"
-                ? "Beri Feedback"
-                : viewMode === "edit"
-                ? "Edit Feedback"
-                : "Detail Feedback"}
-            </DialogTitle>
-            <DialogDescription>
-              {viewMode === "create"
-                ? "Pilih booking yang telah selesai, beri rating & komentar."
-                : viewMode === "edit"
-                ? "Perbarui rating atau komentar Anda."
-                : "Ringkasan penilaian & komentar."}
-            </DialogDescription>
+            <DialogTitle>Detail Feedback</DialogTitle>
+            <DialogDescription>Ringkasan penilaian & komentar pengguna</DialogDescription>
           </DialogHeader>
 
           {/* VIEW */}
-          {viewMode === "view" && selected && (
+          {selected && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -479,57 +423,6 @@ export default function FeedbackPage() {
             </div>
           )}
 
-          {/* CREATE / EDIT */}
-          {(viewMode === "create" || viewMode === "edit") && (
-            <div className="space-y-5">
-              {viewMode === "create" && (
-                <div className="space-y-2">
-                  <Label>Booking</Label>
-                  <Select
-                    value={selectedBookingId}
-                    onValueChange={setSelectedBookingId}
-                  >
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue
-                        placeholder={
-                          selectableBookings.length
-                            ? "Pilih booking selesai"
-                            : "Tidak ada booking tersedia"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      {selectableBookings.map((b) => (
-                        <SelectItem
-                          key={b.id}
-                          value={b.id}
-                          className="rounded-lg"
-                        >
-                          {b.id.slice(-8)} — {formatDateTime(b.endDatetime)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Rating</Label>
-                <StarRating value={formRating} onChange={setFormRating} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Komentar (opsional)</Label>
-                <Textarea
-                  value={formComment}
-                  onChange={(e) => setFormComment(e.target.value)}
-                  placeholder="Tulis pengalaman Anda..."
-                  className="rounded-xl min-h-[96px]"
-                />
-              </div>
-            </div>
-          )}
-
           <DialogFooter>
             <Button
               variant="outline"
@@ -538,23 +431,6 @@ export default function FeedbackPage() {
             >
               Tutup
             </Button>
-            {viewMode === "create" && (
-              <Button
-                disabled={!selectedBookingId || !formRating}
-                onClick={onCreate}
-                className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
-              >
-                Kirim
-              </Button>
-            )}
-            {viewMode === "edit" && (
-              <Button
-                onClick={onUpdate}
-                className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
-              >
-                Simpan Perubahan
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

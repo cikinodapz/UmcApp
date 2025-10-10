@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -22,10 +21,11 @@ import {
 import { DataTable } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
 import { useAuth } from "@/contexts/auth-context";
-import { mockPayments, mockBookings, mockUsers } from "@/lib/mock";
+import { fetchData } from "@/lib/api";
 import { PaymentStatus, PaymentMethod, Role } from "@/types";
 import { formatCurrency, formatDateTime } from "@/lib/format";
-import { Upload, CreditCard, Eye, Edit } from "lucide-react";
+import { CreditCard, Eye, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import Swal from "sweetalert2";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PaymentsPage() {
@@ -34,45 +34,72 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
-  const [proofFile, setProofFile] = useState<File | null>(null);
-  const [newStatus, setNewStatus] = useState("");
+  const [detailByBooking, setDetailByBooking] = useState<any>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [completing, setCompleting] = useState<string | null>(null);
 
   const isAdmin = user?.role === Role.ADMIN;
 
-  // Get payments with booking and user details
-  const paymentsWithDetails = mockPayments
-    .map((payment) => {
-      const booking = mockBookings.find((b) => b.id === payment.bookingId);
-      const bookingUser = booking
-        ? mockUsers.find((u) => u.id === booking.userId)
-        : null;
+  // Fetch payments list from API
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoadingList(true);
+        setError(null);
+        const data = await fetchData("/payments");
+        const arr = Array.isArray(data) ? data : [];
+        setPayments(
+          arr.map((p: any) => ({
+            ...p,
+            amount: typeof p.amount === "string" ? Number(p.amount) : p.amount,
+          }))
+        );
+      } catch (e: any) {
+        setError(e?.message || "Gagal memuat pembayaran");
+      } finally {
+        setLoadingList(false);
+      }
+    };
+    load();
+  }, []);
 
-      return {
-        ...payment,
-        bookingCode: booking?.id.slice(-8) || "Unknown",
-        userName: bookingUser?.name || "Unknown",
-        userEmail: bookingUser?.email || "",
-        bookingStartDate: booking?.startDatetime || "",
-      };
-    })
-    .filter((payment) =>
-      isAdmin
-        ? true
-        : mockBookings.some(
-            (b) => b.id === payment.bookingId && b.userId === user?.id
-          )
-    )
-    .filter(
-      (payment) =>
-        !statusFilter ||
-        statusFilter === "all" ||
-        payment.status === statusFilter
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.paidAt || "1970-01-01").getTime() -
-        new Date(a.paidAt || "1970-01-01").getTime()
-    );
+  const paymentsWithDetails = useMemo(() => {
+    return payments
+      .map((payment: any) => {
+        const booking = payment.booking;
+        const bookingUser = booking?.user;
+        return {
+          ...payment,
+          bookingCode:
+            booking?.id?.slice?.(-8) || payment.bookingId?.slice?.(-8) || "Unknown",
+          userName: bookingUser?.name || "Unknown",
+          userEmail: bookingUser?.email || "",
+          bookingStartDate: booking?.startDate || booking?.startDatetime || "",
+        };
+      })
+      .filter((payment: any) =>
+        isAdmin ? true : payment?.booking?.userId === user?.id
+      )
+      .filter(
+        (payment: any) =>
+          !statusFilter || statusFilter === "all" || payment.status === statusFilter
+      )
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.paidAt || "1970-01-01").getTime() -
+          new Date(a.paidAt || "1970-01-01").getTime()
+      );
+  }, [payments, isAdmin, user?.id, statusFilter]);
+
+  const pagedPayments = useMemo(
+    () => paymentsWithDetails.slice((page - 1) * pageSize, page * pageSize),
+    [paymentsWithDetails, page, pageSize]
+  );
 
   // Define columns for payments table
   const paymentColumns = [
@@ -99,6 +126,13 @@ export default function PaymentsPage() {
           },
         ]
       : []),
+    {
+      key: "bookingStatus",
+      title: "Status Booking",
+      render: (_: any, item: any) => (
+        <StatusBadge status={item?.booking?.status || "-"} />
+      ),
+    },
     {
       key: "amount",
       title: "Jumlah",
@@ -137,56 +171,105 @@ export default function PaymentsPage() {
       title: "Aksi",
       render: (_: any, payment: any) => (
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="rounded-lg">
-            <a href={`/payments/${payment.id}/edit`}>
-              <Edit className="w-4 h-4" />
-            </a>
-          </Button>
-
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
               setSelectedPayment(payment);
-              setNewStatus(payment.status);
-              setPaymentDialogOpen(true);
+              fetchDetail(payment.bookingId);
             }}
             className="rounded-lg"
           >
-            {payment.status === PaymentStatus.PENDING ? (
-              <Upload className="w-4 h-4" />
-            ) : (
-              <Eye className="w-4 h-4" />
-            )}
+            <Eye className="w-4 h-4" />
           </Button>
+
+          {payment.status === PaymentStatus.PAID && payment?.booking?.status !== "SELESAI" && (
+            <Button
+              size="sm"
+              onClick={() => handleCompleteClick(payment.bookingId)}
+              className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white"
+              disabled={completing === payment.bookingId}
+            >
+              {completing === payment.bookingId ? "Memproses..." : "Tandai Selesai"}
+            </Button>
+          )}
         </div>
       ),
     },
   ];
 
-  const handleUpdatePayment = () => {
-    if (!selectedPayment) return;
+  async function fetchDetail(bookingId: string) {
+    if (!bookingId) return;
+    try {
+      setLoadingDetail(true);
+      setPaymentDialogOpen(true);
+      const data = await fetchData(`/payments/admin/by-booking/${bookingId}`);
+      setDetailByBooking(data);
+    } catch (e: any) {
+      toast({
+        title: "Gagal memuat detail",
+        description: e?.message || "Terjadi kesalahan",
+      });
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
 
-    // In a real app, this would make an API call
-    console.log("Updating payment:", {
-      id: selectedPayment.id,
-      status: newStatus,
-      proofFile,
+  async function completeBooking(bookingId: string) {
+    try {
+      setCompleting(bookingId);
+      await fetchData(`/bookings/${bookingId}/complete`, { method: "PATCH" });
+      await Swal.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: "Booking berhasil diselesaikan",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      // refresh list and detail
+      await Promise.all([
+        fetchDetail(bookingId),
+        (async () => {
+          const data = await fetchData("/payments");
+          const arr = Array.isArray(data) ? data : [];
+          setPayments(
+            arr.map((p: any) => ({
+              ...p,
+              amount: typeof p.amount === "string" ? Number(p.amount) : p.amount,
+            }))
+          );
+        })(),
+      ]);
+    } catch (e: any) {
+      await Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: e?.message || "Tidak dapat menyelesaikan booking",
+      });
+    }
+    finally {
+      setCompleting(null);
+    }
+  }
+
+  async function handleCompleteClick(bookingId: string) {
+    const res = await Swal.fire({
+      icon: "question",
+      title: "Tandai selesai?",
+      text: "Pastikan pembayaran sudah valid.",
+      showCancelButton: true,
+      confirmButtonText: "Ya, selesaikan",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#4f46e5",
+      customClass: { confirmButton: "rounded-xl", cancelButton: "rounded-xl" },
     });
-
-    toast({
-      title: "Berhasil",
-      description: "Status pembayaran berhasil diperbarui",
-    });
-
-    setPaymentDialogOpen(false);
-    setSelectedPayment(null);
-    setProofFile(null);
-    setNewStatus("");
-  };
+    if (res.isConfirmed) {
+      await completeBooking(bookingId);
+    }
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 md:-ml-24">
       {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Pembayaran</h1>
@@ -228,26 +311,94 @@ export default function PaymentsPage() {
       </div>
 
       {/* Payments Table */}
-      <DataTable
-        data={paymentsWithDetails}
-        columns={paymentColumns}
-        searchPlaceholder="Cari pembayaran..."
-        pageSize={10}
-      />
+      {error ? (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          {error}
+        </div>
+      ) : (
+        <>
+          <DataTable
+            data={loadingList ? [] : pagedPayments}
+            columns={paymentColumns}
+            searchPlaceholder="Cari pembayaran..."
+            pageSize={pageSize}
+          />
+          <div className="mt-2">
+            {/* Pagination ala pemesanan */}
+            <div className="flex items-center justify-between px-1 py-2">
+              <div className="text-sm text-gray-600">
+                Menampilkan <span className="font-medium">{paymentsWithDetails.length === 0 ? 0 : (page - 1) * pageSize + 1}</span>
+                {" - "}
+                <span className="font-medium">{Math.min(page * pageSize, paymentsWithDetails.length)}</span>
+                {" dari "}
+                <span className="font-medium">{paymentsWithDetails.length}</span> data
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Rows</span>
+                  <select
+                    className="h-9 rounded-xl border px-3 text-sm"
+                    value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  >
+                    {[5,10,20,50].map(n => (<option key={n} value={n}>{n}</option>))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(1)} disabled={page <= 1}>
+                    <ChevronsLeft className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  {(() => {
+                    const totalPages = Math.max(1, Math.ceil(paymentsWithDetails.length / pageSize));
+                    const span = 2;
+                    const out: (number | string)[] = [];
+                    const s = Math.max(1, page - span);
+                    const e = Math.min(totalPages, page + span);
+                    if (s > 1) out.push(1);
+                    if (s > 2) out.push("...");
+                    for (let p = s; p <= e; p++) out.push(p);
+                    if (e < totalPages - 1) out.push("...");
+                    if (e < totalPages) out.push(totalPages);
+                    return out.map((p, i) => typeof p === 'string' ? (
+                      <span key={`ellipsis-${i}`} className="px-2 text-sm text-gray-500">{p}</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        variant={p === page ? 'default' : 'outline'}
+                        size="sm"
+                        className={p === page ? 'rounded-xl bg-indigo-600' : 'rounded-xl'}
+                        onClick={() => setPage(p)}
+                      >
+                        {p}
+                      </Button>
+                    ));
+                  })()}
+                  <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(p => {
+                    const totalPages = Math.max(1, Math.ceil(paymentsWithDetails.length / pageSize));
+                    return Math.min(totalPages, p + 1);
+                  })}>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" className="rounded-xl" size="sm" onClick={() => setPage(() => Math.max(1, Math.ceil(paymentsWithDetails.length / pageSize)))}>
+                    <ChevronsRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Payment Dialog */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent className="sm:max-w-[500px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {selectedPayment?.status === PaymentStatus.PENDING
-                ? "Upload Bukti Pembayaran"
-                : "Detail Pembayaran"}
-            </DialogTitle>
+            <DialogTitle>Detail Pembayaran</DialogTitle>
             <DialogDescription>
-              {selectedPayment?.status === PaymentStatus.PENDING
-                ? "Upload bukti pembayaran dan ubah status"
-                : "Lihat detail pembayaran"}
+              Lihat informasi pembayaran dan selesaikan booking bila sesuai.
             </DialogDescription>
           </DialogHeader>
 
@@ -277,73 +428,57 @@ export default function PaymentsPage() {
                 </div>
               </div>
 
-              {/* Proof Upload */}
-              {selectedPayment.status === PaymentStatus.PENDING && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="proof">Bukti Pembayaran</Label>
-                    <Input
-                      id="proof"
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(e) =>
-                        setProofFile(e.target.files?.[0] || null)
-                      }
-                      className="rounded-xl"
-                    />
-                  </div>
-
-                  {isAdmin && (
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status Baru</Label>
-                      <Select value={newStatus} onValueChange={setNewStatus}>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem
-                            value={PaymentStatus.PENDING}
-                            className="rounded-lg"
-                          >
-                            Pending
-                          </SelectItem>
-                          <SelectItem
-                            value={PaymentStatus.PAID}
-                            className="rounded-lg"
-                          >
-                            Lunas
-                          </SelectItem>
-                          <SelectItem
-                            value={PaymentStatus.FAILED}
-                            className="rounded-lg"
-                          >
-                            Gagal
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+              {/* Detail dari API by-booking */}
+              <div className="space-y-3">
+                {loadingDetail ? (
+                  <p className="text-sm text-gray-500">Memuat detail…</p>
+                ) : detailByBooking ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-500">Pemesan</p>
+                        <p className="font-medium">{detailByBooking.booking?.user?.name}</p>
+                        <p className="text-gray-500">{detailByBooking.booking?.user?.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Periode</p>
+                        <p className="font-medium">
+                          {detailByBooking.booking?.startDate
+                            ? formatDateTime(detailByBooking.booking?.startDate)
+                            : "-"}
+                          {" - "}
+                          {detailByBooking.booking?.endDate
+                            ? formatDateTime(detailByBooking.booking?.endDate)
+                            : "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Total</p>
+                        <p className="font-medium">{formatCurrency(Number(detailByBooking.summary?.totalAmount || selectedPayment.amount))}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Status Terakhir</p>
+                        <StatusBadge status={detailByBooking.summary?.latestPaymentStatus || selectedPayment.status} />
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Existing Proof */}
-              {selectedPayment.proofUrl && (
-                <div className="space-y-2">
-                  <Label>Bukti Pembayaran</Label>
-                  <div className="p-4 border rounded-xl">
-                    <p className="text-sm text-gray-600">
-                      File bukti pembayaran tersedia
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 rounded-lg bg-transparent"
-                    >
-                      Lihat Bukti
-                    </Button>
+                    {detailByBooking.latestPayment?.proofUrl && (
+                      <div className="space-y-1">
+                        <Label>Bukti Pembayaran</Label>
+                        <a
+                          className="text-indigo-600 text-sm underline"
+                          href={detailByBooking.latestPayment?.proofUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Buka bukti pembayaran
+                        </a>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-gray-500">Detail tidak tersedia</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -355,14 +490,7 @@ export default function PaymentsPage() {
             >
               Tutup
             </Button>
-            {selectedPayment?.status === PaymentStatus.PENDING && (
-              <Button
-                onClick={handleUpdatePayment}
-                className="rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700"
-              >
-                {isAdmin ? "Update Status" : "Upload Bukti"}
-              </Button>
-            )}
+            {/* Tombol tandai selesai dipindah ke tabel (inline) agar tidak duplikatif di dialog */}
           </DialogFooter>
         </DialogContent>
       </Dialog>
