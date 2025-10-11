@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import Image from "next/image"
+import { HeroSlideshow } from "@/components/hero-slideshow"
+import { Reveal } from "@/components/reveal"
 import { Mic, Video, Lightbulb, Star, ArrowRight, CheckCircle } from "lucide-react"
 
 const features = [
@@ -31,7 +33,7 @@ const features = [
 ]
 
 const stats = [
-  { value: "500+", label: "Peralatan Tersedia" },
+  { value: "500+", label: "Layanan Tersedia" },
   { value: "1000+", label: "Mahasiswa Terlayani" },
   { value: "50+", label: "Jenis Kategori" },
   { value: "24/7", label: "Dukungan Online" },
@@ -41,7 +43,7 @@ const testimonials = [
   {
     name: "Ahmad Rizki",
     role: "Mahasiswa Film & TV",
-    content: "Peralatan berkualitas tinggi dengan harga terjangkau. Sangat membantu untuk project kuliah!",
+    content: "Layanan berkualitas tinggi dengan harga terjangkau. Sangat membantu untuk project kuliah!",
     rating: 5,
   },
   {
@@ -53,7 +55,7 @@ const testimonials = [
   {
     name: "Budi Santoso",
     role: "Mahasiswa Desain",
-    content: "Koleksi peralatan lengkap dan selalu terawat dengan baik. Recommended!",
+    content: "Pilihan jasa lengkap dan proses pemesanan mudah. Recommended!",
     rating: 5,
   },
 ]
@@ -79,7 +81,7 @@ export default function LandingPage() {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
                   UMC Media Hub
                 </h1>
-                <p className="text-xs text-gray-500">Rental Multimedia</p>
+                <p className="text-xs text-gray-500">Sistem Informasi Pemesanan Jasa Multimedia UMC</p>
               </div>
             </div>
             <nav className="hidden md:flex items-center gap-8 mx-auto">
@@ -89,8 +91,8 @@ export default function LandingPage() {
               <Link href="#features" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors">
                 Fitur
               </Link>
-              <Link href="#equipment" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors">
-                Peralatan
+              <Link href="#services" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors">
+                Layanan
               </Link>
               <Link href="#testimonials" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors">
                 Testimoni
@@ -117,22 +119,22 @@ export default function LandingPage() {
       <section id="hero" className="py-20 bg-gradient-to-br from-indigo-50 via-white to-violet-50">
         <div className="container mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
+            <Reveal className="space-y-8" variant="fade-up">
               <div className="space-y-4">
                 <Badge className="rounded-xl bg-indigo-100 text-indigo-700 hover:bg-indigo-100">
                   <Star className="w-4 h-4 mr-2" />
-                  Platform Rental Terpercaya
+                  Platform Pemesanan Jasa Multimedia
                 </Badge>
                 <h1 className="text-5xl font-bold text-gray-900 leading-tight">
-                  Sewa Peralatan{" "}
+                  Pesan Jasa{" "}
                   <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
                     Multimedia
                   </span>{" "}
                   Profesional
                 </h1>
                 <p className="text-xl text-gray-600 leading-relaxed">
-                  Akses mudah ke peralatan multimedia berkualitas tinggi untuk mendukung project kreatif Anda. Dari
-                  kamera profesional hingga sistem audio terdepan.
+                  Akses mudah ke jasa multimedia berkualitas tinggi untuk mendukung project kreatif Anda. Dari
+                  fotografi hingga videografi — semua dalam satu platform.
                 </p>
               </div>
 
@@ -144,7 +146,7 @@ export default function LandingPage() {
                   style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
                 >
                   <Link href="/auth/login">
-                    Mulai Sewa Sekarang
+                    Pesan Jasa Sekarang
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Link>
                 </Button>
@@ -153,28 +155,32 @@ export default function LandingPage() {
                   size="lg"
                   className="rounded-xl border-2 border-indigo-200 hover:bg-indigo-50 text-lg px-8 py-6 bg-transparent"
                 >
-                  Lihat Katalog
+                  Lihat Layanan
                 </Button>
               </div>
 
               <div className="flex items-center gap-8 pt-4">
                 {stats.map((stat, index) => (
-                  <div key={index} className="text-center">
-                    <div className="text-2xl font-bold text-indigo-600">{stat.value}</div>
-                    <div className="text-sm text-gray-500">{stat.label}</div>
-                  </div>
+                  <Reveal key={index} delay={index * 100}>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-indigo-600">{stat.value}</div>
+                      <div className="text-sm text-gray-500">{stat.label}</div>
+                    </div>
+                  </Reveal>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
             <div className="relative">
               <div className="relative z-10">
-                <Image
-                  src="/canon-eos-r5-camera.jpg"
-                  alt="Professional Camera Equipment"
-                  width={600}
-                  height={400}
-                  className="rounded-2xl shadow-2xl"
+                <HeroSlideshow
+                  images={[
+                    { src: "/canon-eos-r5-camera.jpg", alt: "Jasa Fotografi" },
+                    { src: "/sony-a7-iii-camera.jpg", alt: "Jasa Videografi" },
+                    { src: "/rode-videomic-pro-microphone.jpg", alt: "Jasa Audio" },
+                  ]}
+                  intervalMs={3800}
+                  heightClasses="h-[440px] md:h-[520px] lg:h-[600px]"
                 />
               </div>
               <div className="absolute -top-4 -right-4 w-full h-full bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl opacity-20"></div>
@@ -220,13 +226,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Equipment Showcase */}
-      <section id="equipment" className="py-20 bg-gradient-to-br from-gray-50 to-indigo-50">
+      {/* Services Showcase */}
+      <section id="services" className="py-20 bg-gradient-to-br from-gray-50 to-indigo-50">
         <div className="container mx-auto px-6">
+          <Reveal>
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Peralatan Unggulan</h2>
-            <p className="text-xl text-gray-600">Koleksi peralatan multimedia terlengkap dan terbaru</p>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Layanan Unggulan</h2>
+            <p className="text-xl text-gray-600">Pilihan jasa multimedia populer untuk kebutuhan Anda</p>
           </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
@@ -252,8 +260,8 @@ export default function LandingPage() {
                 features: ["Directional Mic", "Battery Powered", "Shock Mount"],
               },
             ].map((item, index) => (
+              <Reveal key={index} delay={index * 120} variant="fade-up">
               <Card
-                key={index}
                 className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group"
               >
                 <div className="relative h-48 overflow-hidden">
@@ -280,6 +288,7 @@ export default function LandingPage() {
                   </div>
                 </CardContent>
               </Card>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -288,29 +297,33 @@ export default function LandingPage() {
       {/* Testimonials */}
       <section id="testimonials" className="py-20 bg-white">
         <div className="container mx-auto px-6">
+          <Reveal>
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Apa Kata Mereka?</h2>
             <p className="text-xl text-gray-600">Testimoni dari mahasiswa yang telah menggunakan layanan kami</p>
           </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-3 gap-8">
             {testimonials.map((testimonial, index) => (
-              <Card key={index} className="rounded-2xl border-0 shadow-lg">
-                <CardContent className="p-8">
-                  <div className="space-y-4">
-                    <div className="flex gap-1">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                      ))}
+              <Reveal key={index} delay={index * 120} variant="fade-up">
+                <Card className="rounded-2xl border-0 shadow-lg">
+                  <CardContent className="p-8">
+                    <div className="space-y-4">
+                      <div className="flex gap-1">
+                        {[...Array(testimonial.rating)].map((_, i) => (
+                          <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                        ))}
+                      </div>
+                      <p className="text-gray-600 leading-relaxed">"{testimonial.content}"</p>
+                      <div>
+                        <p className="font-semibold text-gray-900">{testimonial.name}</p>
+                        <p className="text-sm text-gray-500">{testimonial.role}</p>
+                      </div>
                     </div>
-                    <p className="text-gray-600 leading-relaxed">"{testimonial.content}"</p>
-                    <div>
-                      <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                      <p className="text-sm text-gray-500">{testimonial.role}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -354,22 +367,13 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 flex items-center justify-center">
-                  <Image
-                    src="/logo.png"
-                    alt="UMC Media Hub Logo"
-                    width={40}
-                    height={40}
-                    className="rounded-xl"
-                  />
-                </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">UMC Media Hub</h3>
-                  <p className="text-sm text-gray-400">Rental Multimedia</p>
+                  <p className="text-sm text-gray-400">Sistem Informasi Pemesanan Jasa Multimedia UMC</p>
                 </div>
               </div>
               <p className="text-gray-400">
-                Platform rental peralatan multimedia terpercaya untuk mendukung kreativitas mahasiswa.
+                Platform pemesanan jasa multimedia terpercaya untuk mendukung kreativitas mahasiswa.
               </p>
             </div>
 

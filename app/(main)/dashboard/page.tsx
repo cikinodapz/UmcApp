@@ -4,6 +4,8 @@ import { StatCard } from "@/components/stat-card"
 import { DataTable } from "@/components/data-table"
 import { StatusBadge } from "@/components/status-badge"
 import { useAuth } from "@/contexts/auth-context"
+import { useEffect, useState, useMemo } from "react"
+import { fetchData } from "@/lib/api"
 import {
   mockAssets,
   mockServices,
@@ -20,118 +22,125 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
+import { MiniLineChart } from "@/components/mini-line-chart"
 import Image from "next/image"
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const isAdmin = user?.role === Role.ADMIN
+
+  const [adminDash, setAdminDash] = useState<any | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [stats, setStats] = useState<any | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsError, setStatsError] = useState("")
+
+  useEffect(() => {
+    let mounted = true
+    if (!isAdmin) return
+    async function load() {
+      setLoading(true)
+      setError("")
+      try {
+        const data = await fetchData("/dashboard/admin", { method: "GET" })
+        if (mounted) setAdminDash(data)
+      } catch (e: any) {
+        if (mounted) setError(e?.message || "Gagal memuat dashboard admin")
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    async function loadStats() {
+      setStatsLoading(true)
+      setStatsError("")
+      try {
+        const s = await fetchData("/dashboard/admin/stats", { method: "GET" })
+        if (mounted) setStats(s)
+      } catch (e: any) {
+        if (mounted) setStatsError(e?.message || "Gagal memuat statistik")
+      } finally {
+        if (mounted) setStatsLoading(false)
+      }
+    }
+    loadStats()
+    return () => { mounted = false }
+  }, [isAdmin])
 
   // Admin Dashboard
-  if (user?.role === Role.ADMIN) {
-    // Calculate statistics
-    const totalAssets = mockAssets.length
-    const borrowedAssets = mockAssets.filter((asset) => asset.status === AssetStatus.DIPINJAM).length
-    const pendingBookings = mockBookings.filter((booking) => booking.status === BookingStatus.MENUNGGU).length
-    const pendingPayments = mockPayments.filter((payment) => payment.status === PaymentStatus.PENDING).length
-
-    // Get recent bookings with user and item details
-    const recentBookings = mockBookings
-      .slice(0, 10)
-      .map((booking) => {
-        const bookingUser = mockUsers.find((u) => u.id === booking.userId)
-        const items = mockBookingItems.filter((item) => item.bookingId === booking.id)
-        const totalAmount = items.reduce((sum, item) => sum + item.price, 0)
-
-        return {
-          ...booking,
-          userName: bookingUser?.name || "Unknown",
-          userEmail: bookingUser?.email || "",
-          itemCount: items.length,
-          totalAmount,
-        }
-      })
-      .sort((a, b) => new Date(b.startDatetime).getTime() - new Date(a.startDatetime).getTime())
-
-    // Define columns for recent bookings table
-    const bookingColumns = [
-      {
-        key: "id",
-        title: "ID Booking",
-        render: (value: string) => (
-          <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-md">{value.slice(-8)}</span>
-        ),
-      },
-      {
-        key: "userName",
-        title: "Peminjam",
-        render: (value: string, item: any) => (
-          <div>
-            <p className="font-medium">{value}</p>
-            <p className="text-sm text-gray-500">{item.userEmail}</p>
-          </div>
-        ),
-      },
-      {
-        key: "startDatetime",
-        title: "Tanggal Mulai",
-        render: (value: string) => formatDateTime(value),
-        sortable: true,
-      },
-      {
-        key: "endDatetime",
-        title: "Tanggal Selesai",
-        render: (value: string) => formatDateTime(value),
-      },
-      {
-        key: "itemCount",
-        title: "Jumlah Item",
-        render: (value: number) => `${value} item`,
-      },
-      {
-        key: "totalAmount",
-        title: "Total",
-        render: (value: number) => formatCurrency(value),
-      },
-      {
-        key: "status",
-        title: "Status",
-        render: (value: string) => <StatusBadge status={value} />,
-      },
-    ]
+  if (isAdmin) {
+    const totals = adminDash?.totals || {}
+    const bookings = adminDash?.bookings || {}
+    const payments = adminDash?.payments || {}
+    const recentBookings = adminDash?.recent?.bookings || []
+    const recentPayments = adminDash?.recent?.payments || []
 
     const adminStats = [
       {
-        title: "Total Aset",
-        value: totalAssets,
-        description: "Aset tersedia di inventaris",
+        title: "Pengguna",
+        value: Number(totals?.users?.total || 0),
+        description: `Aktif ${Number(totals?.users?.active || 0)}`,
         icon: Package,
-        trend: { value: 12, isPositive: true },
       },
       {
-        title: "Aset Dipinjam",
-        value: borrowedAssets,
-        description: "Sedang dipinjam pengguna",
+        title: "Jasa Aktif",
+        value: Number(totals?.services?.active || 0),
+        description: `Paket ${Number(totals?.packages || 0)} • Kategori ${Number(totals?.categories || 0)}`,
         icon: TrendingUp,
       },
       {
         title: "Booking Menunggu",
-        value: pendingBookings,
-        description: "Menunggu konfirmasi admin",
+        value: Number(bookings?.waiting || 0),
+        description: "Menunggu konfirmasi",
         icon: Clock,
       },
       {
         title: "Pembayaran Pending",
-        value: pendingPayments,
-        description: "Menunggu konfirmasi pembayaran",
+        value: Number(payments?.pending || 0),
+        description: `Lunas ${Number(payments?.paid || 0)}`,
         icon: CreditCard,
       },
     ]
 
+    const bookingColumns = [
+      { key: "id", title: "ID", render: (v: string) => <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-md">{v?.slice?.(-8)}</span> },
+      { key: "user", title: "Peminjam", render: (_: any, row: any) => (<div><p className="font-medium">{row?.user?.name || "-"}</p></div>) },
+      { key: "createdAt", title: "Dibuat", render: (v: string) => formatDateTime(v) },
+      { key: "type", title: "Tipe" },
+      { key: "totalAmount", title: "Total", render: (v: any) => formatCurrency(Number(v || 0)) },
+      { key: "status", title: "Status", render: (v: string) => <StatusBadge status={v} /> },
+    ]
+
+    const paymentColumns = [
+      { key: "id", title: "ID", render: (v: string) => <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-md">{v?.slice?.(-8)}</span> },
+      { key: "booking", title: "Booking/Peminjam", render: (_: any, row: any) => (<div><p className="font-medium">{row?.booking?.user?.name || "-"}</p><p className="text-xs text-gray-500">{row?.booking?.id?.slice?.(-8)}</p></div>) },
+      { key: "amount", title: "Jumlah", render: (v: any) => formatCurrency(Number(v || 0)) },
+      { key: "method", title: "Metode" },
+      { key: "status", title: "Status", render: (v: string) => <StatusBadge status={v} /> },
+      { key: "createdAt", title: "Dibuat", render: (v: string) => formatDateTime(v) },
+    ]
+
+    // Formatter: "DD MMM" in Indonesian (e.g., 11 Okt)
+    const dayMonthFmt = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short' })
+    const dayMonthLabel = (isoDate: string) => {
+      try {
+        const [y, m, d] = (isoDate || '').split('-').map((s) => parseInt(s, 10))
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const date = new Date(y, (m as number) - 1, d)
+          if (!isNaN(date.getTime())) return dayMonthFmt.format(date)
+        }
+      } catch {}
+      return isoDate
+    }
+
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 md:-ml-24">
         {/* Page Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-2">Kelola sistem peminjaman aset dan jasa multimedia</p>
+          {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
         </div>
 
         {/* Statistics Cards */}
@@ -143,19 +152,67 @@ export default function DashboardPage() {
               value={stat.value}
               description={stat.description}
               icon={stat.icon}
-              trend={stat.trend}
             />
           ))}
         </div>
 
-        {/* Recent Bookings Table */}
-        <DataTable
-          data={recentBookings}
-          columns={bookingColumns}
-          title="Booking Terbaru"
-          searchPlaceholder="Cari booking..."
-          pageSize={8}
-        />
+        {/* Charts */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div>
+            <MiniLineChart
+              data={(stats?.timeline || []).map((d: any) => ({ label: dayMonthLabel(d.key), value: Number(d.total || 0) }))}
+              title="Total Booking per Hari"
+              subtitle={statsLoading ? "Memuat…" : statsError ? statsError : "30 hari terakhir"}
+              stroke="#7c3aed"
+              fill="rgba(124, 58, 237, 0.12)"
+              valueFormatter={(n) => `${n}`}
+            />
+          </div>
+          <div>
+            <MiniLineChart
+              data={(stats?.timeline || []).map((d: any) => ({ label: dayMonthLabel(d.key), value: Number(d.amount || 0) }))}
+              title="Total Amount per Hari"
+              subtitle={statsLoading ? "Memuat…" : statsError ? statsError : "30 hari terakhir"}
+              stroke="#10b981"
+              fill="rgba(16, 185, 129, 0.12)"
+              valueFormatter={(n) => new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(n)}
+            />
+          </div>
+        </div>
+
+        {/* Recent Bookings */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-2xl font-bold text-gray-900">Booking Terbaru</h2>
+            <Button asChild variant="outline" className="rounded-xl bg-transparent">
+              <Link href="/pemesanan">Lihat Semua</Link>
+            </Button>
+          </div>
+          <DataTable
+            data={recentBookings}
+            columns={bookingColumns}
+            title="Booking Terbaru"
+            searchPlaceholder="Cari booking..."
+            pageSize={8}
+          />
+        </div>
+
+        {/* Recent Payments */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-2xl font-bold text-gray-900">Pembayaran Terbaru</h2>
+            <Button asChild variant="outline" className="rounded-xl bg-transparent">
+              <Link href="/payments">Lihat Semua</Link>
+            </Button>
+          </div>
+          <DataTable
+            data={recentPayments}
+            columns={paymentColumns}
+            title="Pembayaran Terbaru"
+            searchPlaceholder="Cari pembayaran..."
+            pageSize={8}
+          />
+        </div>
       </div>
     )
   }

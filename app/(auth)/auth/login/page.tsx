@@ -317,15 +317,20 @@ export default function LoginPage() {
           {/* Tombol resmi Google (fallback) – disembunyikan */}
           <div id="google-signin-button" className="w-full sr-only" />
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Belum punya akun?{" "}
+          <div className="mt-6 flex items-center justify-between text-sm">
+            <Link
+              href="/auth/forgot"
+              className="text-indigo-600 hover:text-indigo-700 underline-offset-4 hover:underline"
+            >
+              Lupa password?
+            </Link>
             <Link
               href="/auth/register"
-              className="font-medium text-indigo-600 hover:text-indigo-700 underline-offset-4 hover:underline"
+              className="text-indigo-600 hover:text-indigo-700 underline-offset-4 hover:underline"
             >
-              Daftar di sini
+              Daftar akun baru
             </Link>
-          </p>
+          </div>
         </CardContent>
       </Card>
     </div>

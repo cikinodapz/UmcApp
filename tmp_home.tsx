@@ -6,9 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { formatDateTime } from "@/lib/format"
 import { fetchData } from "@/lib/api"
-import { Role } from "@/types"
-import { Calendar, CreditCard, AlertTriangle, MessageSquare, Plus, ArrowRight, Clock } from "lucide-react"
+import { BookingStatus, Role } from "@/types"
+import {
+  Calendar,
+  CreditCard,
+  AlertTriangle,
+  MessageSquare,
+  Plus,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+} from "lucide-react"
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -49,7 +59,7 @@ export default function DashboardPage() {
     <div className="max-w-7xl mx-auto px-4 space-y-8">
       {/* Header (bukan bar kedua) */}
       <header className="pt-4">
-        <div className="flex items-start justify-start gap-4">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">
               {isPeminjam ? "Beranda Peminjam" : "Beranda"}
@@ -58,7 +68,20 @@ export default function DashboardPage() {
               Halo{user?.name ? `, ${user.name}` : ""}! Kelola peminjaman, pembayaran, dan denda Anda dari satu tempat.
             </p>
           </div>
-          {/* CTA dihapus sesuai permintaan */}
+          <Button
+            asChild
+            className="rounded-xl h-12 !bg-indigo-600 hover:!bg-indigo-700 !text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 !border-0"
+            style={{
+              background:
+                "linear-gradient(to right, rgb(99, 102, 241), rgb(139, 92, 246))",
+              color: "white",
+            }}
+          >
+            <Link href="/katalog">
+              <Plus className="w-4 h-4 mr-2" />
+              Buat Pinjaman
+            </Link>
+          </Button>
         </div>
       </header>
 
@@ -115,9 +138,9 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Upcoming booking */}
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="rounded-2xl">
+      {/* Upcoming booking + Quick actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="rounded-2xl lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">Jadwal Terdekat</CardTitle>
@@ -125,19 +148,28 @@ export default function DashboardPage() {
             </div>
             <Badge variant="secondary" className="rounded-lg">
               <Clock className="w-3.5 h-3.5 mr-1" />
-              {nextUpcoming ? "Tersedia" : "Tidak ada"}
+              {upcomingBooking ? "Tersedia" : "Tidak ada"}
             </Badge>
           </CardHeader>
           <CardContent>
             {nextUpcoming ? (
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <p className="text-lg font-semibold">Jadwal terdekat tersedia</p>
-                  <p className="text-sm text-gray-500">Segera cek detail pemesanan Anda.</p>
+                  <p className="text-lg font-semibold">
+                    #{upcomingBooking.id.slice(-8)}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {formatDateTime(upcomingBooking.startDatetime)} — {formatDateTime(upcomingBooking.endDatetime)}
+                  </p>
+                  <div className="mt-2">
+                    <Badge className="rounded-lg">
+                      {upcomingBooking.status === BookingStatus.DIKONFIRMASI ? "Dikonfirmasi" : "Menunggu"}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button asChild variant="outline" className="rounded-xl">
-                    <Link href={`/booking`}>Detail</Link>
+                    <Link href={`/bookings/${upcomingBooking.id}`}>Detail</Link>
                   </Button>
                   <Button
                     asChild
@@ -148,7 +180,7 @@ export default function DashboardPage() {
                       color: "white",
                     }}
                   >
-                    <Link href="/booking">Kelola Pemesanan</Link>
+                    <Link href="/booking">Kelola Booking</Link>
                   </Button>
                 </div>
               </div>
@@ -177,28 +209,105 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Aksi Cepat dihilangkan sesuai permintaan */}
-      </div>
-
-      {/* Additional Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle className="text-base">Keranjang</CardTitle>
-            <CardDescription>Item di keranjang</CardDescription>
+            <CardTitle className="text-base">Aksi Cepat</CardTitle>
+            <CardDescription>Hal-hal yang sering kamu lakukan</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold">{Number(dash?.cart?.count || 0)}</p>
+          <CardContent className="grid gap-3">
+            <Button asChild variant="outline" className="justify-start rounded-xl">
+              <Link href="/katalog">
+                <Plus className="w-4 h-4 mr-2" />
+                Booking Baru
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="justify-start rounded-xl">
+              <Link href="/payments">
+                <CreditCard className="w-4 h-4 mr-2" />
+                Lihat Pembayaran
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="justify-start rounded-xl">
+              <Link href="/fines">
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Lihat Denda
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="justify-start rounded-xl">
+              <Link href="/feedback">
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Beri Feedback
+              </Link>
+            </Button>
           </CardContent>
         </Card>
-        
+      </div>
+
+      {/* Lists */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle className="text-base">Feedback</CardTitle>
-            <CardDescription>Dikirim</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Pembayaran Menunggu</CardTitle>
+              <CardDescription>Unggah bukti atau selesaikan pembayaran</CardDescription>
+            </div>
+            <Button asChild variant="ghost" className="rounded-xl">
+              <Link href="/payments">
+                Lihat semua <ArrowRight className="w-4 h-4 ml-1" />
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{Number(dash?.feedback?.count || 0)}</p>
+            {paymentsPending.length === 0 ? (
+              <EmptyRow text="Tidak ada pembayaran pending" icon={<CheckCircle2 className="w-4 h-4" />} />
+            ) : (
+              <ul className="space-y-3">
+                {paymentsPending.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between rounded-xl border p-3">
+                    <div>
+                      <p className="font-medium">#{p.bookingId.slice(-8)}</p>
+                      <p className="text-sm text-gray-500">{formatCurrency(Number(p.amount || 0))}</p>
+                    </div>
+                    <Button asChild size="sm" className="rounded-lg">
+                      <Link href="/payments">Bayar</Link>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Denda Belum Lunas</CardTitle>
+              <CardDescription>Selesaikan agar akun tetap sehat</CardDescription>
+            </div>
+            <Button asChild variant="ghost" className="rounded-xl">
+              <Link href="/fines">
+                Lihat semua <ArrowRight className="w-4 h-4 ml-1" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {finesUnpaid.length === 0 ? (
+              <EmptyRow text="Tidak ada denda" icon={<CheckCircle2 className="w-4 h-4" />} />
+            ) : (
+              <ul className="space-y-3">
+                {finesUnpaid.map((f) => (
+                  <li key={f.id} className="flex items-center justify-between rounded-xl border p-3">
+                    <div>
+                      <p className="font-medium">
+                        #{f.bookingId.slice(-8)} — {f.type}
+                      </p>
+                      <p className="text-sm text-gray-500">{f.notes || "—"}</p>
+                    </div>
+                    <span className="text-sm font-semibold">{formatCurrency(Number(f.amount || 0))}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -216,5 +325,4 @@ function EmptyRow({ text, icon }: { text: string; icon?: React.ReactNode }) {
     </div>
   )
 }
-
 
