@@ -6,7 +6,7 @@ type Point = { label: string; value: number }
 
 export function MiniLineChart({
   data,
-  height = 360,
+  height = 340,
   stroke = "#4f46e5",
   fill = "rgba(99, 102, 241, 0.12)",
   grid = true,
@@ -30,7 +30,7 @@ export function MiniLineChart({
   subtitle?: string
 }) {
   const width = 1000 // will scale via viewBox + CSS
-  const padding = { top: 34, right: 34, bottom: 74, left: 76 }
+  const padding = { top: 32, right: 32, bottom: 64, left: 68 }
   const innerW = width - padding.left - padding.right
   const innerH = height - padding.top - padding.bottom
 
@@ -133,7 +133,7 @@ export function MiniLineChart({
             return (
               <g key={i}>
                 <line x1={padding.left} y1={yy} x2={padding.left + innerW} y2={yy} stroke="#e5e7eb" strokeDasharray="4 4" />
-                <text x={padding.left - 16} y={yy} textAnchor="end" dominantBaseline="middle" fontSize="18" fill="#111827" fontWeight={700}>
+                <text x={padding.left - 14} y={yy} textAnchor="end" dominantBaseline="middle" fontSize="16" fill="#111827" fontWeight={600}>
                   {valueFormatter ? valueFormatter(t) : t}
                 </text>
               </g>
@@ -146,16 +146,16 @@ export function MiniLineChart({
               {data.map((d, idx) => {
                 if (idx % step !== 0 && idx !== data.length - 1) return null
                 const [xx] = points[idx]
-                const yy = height - (padding.bottom - 14)
+                const yy = height - (padding.bottom - 12)
                 return (
                   <text
                     key={idx}
                     x={xx}
                     y={yy}
                     textAnchor="end"
-                    fontSize="18"
+                    fontSize="16"
                     fill="#111827"
-                    fontWeight={700}
+                    fontWeight={600}
                     transform={`rotate(-32 ${xx} ${yy})`}
                   >
                     {d.label}
@@ -173,7 +173,7 @@ export function MiniLineChart({
 
           {/* Dots */}
           {showDots && points.map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={hoverIdx === i ? 6 : 5} fill={stroke} />
+            <circle key={i} cx={x} cy={y} r={hoverIdx === i ? 5 : 4} fill={stroke} />
           ))}
 
           {/* Hover vertical line and active dot */}

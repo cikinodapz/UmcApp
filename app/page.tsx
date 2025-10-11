@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import Image from "next/image"
+import { HeroSlideshow } from "@/components/hero-slideshow"
+import { Reveal } from "@/components/reveal"
 import { Mic, Video, Lightbulb, Star, ArrowRight, CheckCircle } from "lucide-react"
 
 const features = [
@@ -117,7 +119,7 @@ export default function LandingPage() {
       <section id="hero" className="py-20 bg-gradient-to-br from-indigo-50 via-white to-violet-50">
         <div className="container mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
+            <Reveal className="space-y-8" variant="fade-up">
               <div className="space-y-4">
                 <Badge className="rounded-xl bg-indigo-100 text-indigo-700 hover:bg-indigo-100">
                   <Star className="w-4 h-4 mr-2" />
@@ -159,22 +161,26 @@ export default function LandingPage() {
 
               <div className="flex items-center gap-8 pt-4">
                 {stats.map((stat, index) => (
-                  <div key={index} className="text-center">
-                    <div className="text-2xl font-bold text-indigo-600">{stat.value}</div>
-                    <div className="text-sm text-gray-500">{stat.label}</div>
-                  </div>
+                  <Reveal key={index} delay={index * 100}>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-indigo-600">{stat.value}</div>
+                      <div className="text-sm text-gray-500">{stat.label}</div>
+                    </div>
+                  </Reveal>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
             <div className="relative">
               <div className="relative z-10">
-                <Image
-                  src="/canon-eos-r5-camera.jpg"
-                  alt="Ilustrasi Layanan Multimedia"
-                  width={600}
-                  height={400}
-                  className="rounded-2xl shadow-2xl"
+                <HeroSlideshow
+                  images={[
+                    { src: "/canon-eos-r5-camera.jpg", alt: "Jasa Fotografi" },
+                    { src: "/sony-a7-iii-camera.jpg", alt: "Jasa Videografi" },
+                    { src: "/rode-videomic-pro-microphone.jpg", alt: "Jasa Audio" },
+                  ]}
+                  intervalMs={3800}
+                  heightClasses="h-[440px] md:h-[520px] lg:h-[600px]"
                 />
               </div>
               <div className="absolute -top-4 -right-4 w-full h-full bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl opacity-20"></div>
@@ -223,10 +229,12 @@ export default function LandingPage() {
       {/* Services Showcase */}
       <section id="services" className="py-20 bg-gradient-to-br from-gray-50 to-indigo-50">
         <div className="container mx-auto px-6">
+          <Reveal>
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Layanan Unggulan</h2>
             <p className="text-xl text-gray-600">Pilihan jasa multimedia populer untuk kebutuhan Anda</p>
           </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
@@ -252,8 +260,8 @@ export default function LandingPage() {
                 features: ["Directional Mic", "Battery Powered", "Shock Mount"],
               },
             ].map((item, index) => (
+              <Reveal key={index} delay={index * 120} variant="fade-up">
               <Card
-                key={index}
                 className="rounded-2xl border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group"
               >
                 <div className="relative h-48 overflow-hidden">
@@ -280,6 +288,7 @@ export default function LandingPage() {
                   </div>
                 </CardContent>
               </Card>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -288,29 +297,33 @@ export default function LandingPage() {
       {/* Testimonials */}
       <section id="testimonials" className="py-20 bg-white">
         <div className="container mx-auto px-6">
+          <Reveal>
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Apa Kata Mereka?</h2>
             <p className="text-xl text-gray-600">Testimoni dari mahasiswa yang telah menggunakan layanan kami</p>
           </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-3 gap-8">
             {testimonials.map((testimonial, index) => (
-              <Card key={index} className="rounded-2xl border-0 shadow-lg">
-                <CardContent className="p-8">
-                  <div className="space-y-4">
-                    <div className="flex gap-1">
-                      {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                      ))}
+              <Reveal key={index} delay={index * 120} variant="fade-up">
+                <Card className="rounded-2xl border-0 shadow-lg">
+                  <CardContent className="p-8">
+                    <div className="space-y-4">
+                      <div className="flex gap-1">
+                        {[...Array(testimonial.rating)].map((_, i) => (
+                          <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                        ))}
+                      </div>
+                      <p className="text-gray-600 leading-relaxed">"{testimonial.content}"</p>
+                      <div>
+                        <p className="font-semibold text-gray-900">{testimonial.name}</p>
+                        <p className="text-sm text-gray-500">{testimonial.role}</p>
+                      </div>
                     </div>
-                    <p className="text-gray-600 leading-relaxed">"{testimonial.content}"</p>
-                    <div>
-                      <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                      <p className="text-sm text-gray-500">{testimonial.role}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Reveal>
             ))}
           </div>
         </div>

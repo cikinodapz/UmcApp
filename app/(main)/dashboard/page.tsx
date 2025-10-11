@@ -121,6 +121,19 @@ export default function DashboardPage() {
       { key: "createdAt", title: "Dibuat", render: (v: string) => formatDateTime(v) },
     ]
 
+    // Formatter: "DD MMM" in Indonesian (e.g., 11 Okt)
+    const dayMonthFmt = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short' })
+    const dayMonthLabel = (isoDate: string) => {
+      try {
+        const [y, m, d] = (isoDate || '').split('-').map((s) => parseInt(s, 10))
+        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+          const date = new Date(y, (m as number) - 1, d)
+          if (!isNaN(date.getTime())) return dayMonthFmt.format(date)
+        }
+      } catch {}
+      return isoDate
+    }
+
     return (
       <div className="space-y-6 md:-ml-24">
         {/* Page Header */}
@@ -130,7 +143,7 @@ export default function DashboardPage() {
           {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
         </div>
 
-        {/* Statistics Cards */
+        {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {adminStats.map((stat, index) => (
             <StatCard
@@ -147,7 +160,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div>
             <MiniLineChart
-              data={(stats?.timeline || []).map((d: any) => ({ label: monthLabel(d.key), value: Number(d.total || 0) }))}
+              data={(stats?.timeline || []).map((d: any) => ({ label: dayMonthLabel(d.key), value: Number(d.total || 0) }))}
               title="Total Booking per Hari"
               subtitle={statsLoading ? "Memuat…" : statsError ? statsError : "30 hari terakhir"}
               stroke="#7c3aed"
@@ -157,7 +170,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <MiniLineChart
-              data={(stats?.timeline || []).map((d: any) => ({ label: monthLabel(d.key), value: Number(d.amount || 0) }))}
+              data={(stats?.timeline || []).map((d: any) => ({ label: dayMonthLabel(d.key), value: Number(d.amount || 0) }))}
               title="Total Amount per Hari"
               subtitle={statsLoading ? "Memuat…" : statsError ? statsError : "30 hari terakhir"}
               stroke="#10b981"
@@ -352,11 +365,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-    const monthFmt = new Intl.DateTimeFormat('id-ID', { month: 'long' })
-    const monthLabel = (isoDate: string) => {
-      try {
-        const d = new Date(isoDate)
-        if (!isNaN(d.getTime())) return monthFmt.format(d)
-      } catch {}
-      return isoDate
-    }
