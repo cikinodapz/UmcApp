@@ -1,5 +1,3 @@
-// app/(main)/cart/page.test.tsx
-
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import CartPage from './page';
@@ -8,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 import { useToast } from '@/hooks/use-toast';
 
-// --- 1. MOCK DEPENDENCIES ---
 jest.mock('@/lib/api', () => ({
   fetchData: jest.fn(),
 }));
@@ -25,7 +22,6 @@ jest.mock('sweetalert2', () => ({
   fire: jest.fn(),
 }));
 
-// PERBAIKAN: Destructure props untuk menghindari warning 'received true for non-boolean attribute'
 jest.mock('next/image', () => ({
   __esModule: true,
   default: ({ fill, ...props }: any) => <img {...props} alt={props.alt} />,
@@ -45,7 +41,6 @@ jest.mock('@/lib/format', () => ({
   formatCurrency: (val: number) => `Rp ${val}`,
 }));
 
-// --- 2. DUMMY DATA ---
 const mockItems = [
   {
     id: 'cart1',
@@ -122,7 +117,6 @@ describe('CartPage', () => {
     fireEvent.change(qtyInput, { target: { value: '3' } });
     expect(qtyInput).toHaveValue(3);
 
-    // Klik Simpan
     const saveBtns = screen.getAllByText('Simpan Perubahan');
     fireEvent.click(saveBtns[0]);
 
@@ -184,13 +178,6 @@ describe('CartPage', () => {
     await screen.findByText('Cuci Mobil');
 
     // PERBAIKAN SELEKSI INPUT TANGGAL
-    // Karena label tidak terasosiasi, kita cari elemen label dulu, lalu ambil sibling-nya (input)
-    // Atau gunakan placeholder/test-id jika ada.
-    // Di sini kita gunakan trik: Cari label text, lalu parent div, lalu input di dalamnya.
-    
-    // 1. Tanggal Mulai
-    // Struktur: <div> <label>Tanggal Mulai</label> <input /> </div>
-    // Kita cari teks "Tanggal Mulai", ambil parent, lalu cari input.
     const startLabel = screen.getByText('Tanggal Mulai');
     // Ambil parent div (container)
     const startContainer = startLabel.parentElement as HTMLElement;

@@ -4,30 +4,25 @@ import BookingPage from './page';
 import { fetchData } from '@/lib/api';
 import Swal from 'sweetalert2';
 
-// --- MOCKS ---
 jest.mock('@/lib/api', () => ({ fetchData: jest.fn() }));
 jest.mock('sweetalert2', () => ({ fire: jest.fn() }));
 jest.mock('@/components/ui/use-toast', () => ({ useToast: () => ({ toast: jest.fn() }) }));
 
-// Mock Next Image (Handle fill prop error)
 jest.mock('next/image', () => ({
   __esModule: true,
   default: ({ fill, ...props }: any) => <img {...props} alt={props.alt || 'img'} />,
 }));
 
-// Mock Formatters (PENTING: Mock fungsi yang dipanggil komponen)
 jest.mock('@/lib/format', () => ({
   formatCurrency: (val: number) => `Rp ${val}`,
   formatDate: (date: string) => date,
-  getStatusColor: () => 'bg-red-500', // Dummy class
+  getStatusColor: () => 'bg-red-500', 
   getStatusText: (s: string) => s,
 }));
 
-// Mock Window Open
 const mockOpen = jest.fn();
 Object.defineProperty(window, 'open', { value: mockOpen });
 
-// Mock LocalStorage
 const localStorageMock = (function () {
   let store: Record<string, string> = {};
   return {
@@ -38,7 +33,6 @@ const localStorageMock = (function () {
 })();
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
-// --- DATA DUMMY LENGKAP ---
 const mockBookings = [
   // Kasus 1: Menunggu (Untuk Test Cancel)
   {
@@ -56,16 +50,16 @@ const mockBookings = [
   {
     id: 'b3', userId: 'u1', type: 'Campur', status: 'DITOLAK',
     startDate: '2025-03-01', endDate: '2025-03-02', totalAmount: '300000',
-    notes: 'Alasan ditolak: Stok habis', // Regex match logic
+    notes: 'Alasan ditolak: Stok habis', 
     items: [
       {
         id: 'i1', type: 'service', quantity: 2, unitPrice: '50000', subtotal: '100000',
-        service: { name: 'Cuci Aset', photoUrl: 'https://img.com/1.jpg' }, // URL absolut
-        package: { name: 'Paket Kilat', features: ['Cepat', 'Bersih', 'Wangi', 'Murah'] } // >3 features logic
+        service: { name: 'Cuci Aset', photoUrl: 'https://img.com/1.jpg' }, 
+        package: { name: 'Paket Kilat', features: ['Cepat', 'Bersih', 'Wangi', 'Murah'] } 
       },
       {
         id: 'i2', type: 'asset', quantity: 1, unitPrice: '50000', subtotal: '50000',
-        service: { name: 'Sewa Kamera', photoUrl: '/uploads/cam.jpg' } // URL relatif
+        service: { name: 'Sewa Kamera', photoUrl: '/uploads/cam.jpg' } 
       }
     ],
     user: { name: 'User Tiga' }
@@ -92,15 +86,15 @@ describe('BookingPage Coverage', () => {
     // Cek User
     expect(screen.getByText('User Satu')).toBeInTheDocument();
     
-    // Cek Logic DITOLAK (Line 260+)
+    // Cek Logic DITOLAK
     expect(screen.getByText('Alasan Ditolak')).toBeInTheDocument();
-    expect(screen.getByText('Stok habis')).toBeInTheDocument(); // Hasil regex extract
+    expect(screen.getByText('Stok habis')).toBeInTheDocument(); 
 
-    // Cek Logic Item Detail & Features (Line 270+)
+    // Cek Logic Item Detail & Features 
     expect(screen.getByText('Cuci Aset')).toBeInTheDocument();
     expect(screen.getByText('Paket Kilat')).toBeInTheDocument();
-    expect(screen.getByText('Cepat')).toBeInTheDocument(); // Feature 1
-    expect(screen.getByText('+1 lagi')).toBeInTheDocument(); // Feature overflow logic
+    expect(screen.getByText('Cepat')).toBeInTheDocument(); 
+    expect(screen.getByText('+1 lagi')).toBeInTheDocument(); 
   });
 
   it('menangani error saat load data (Line 48-52)', async () => {
@@ -110,11 +104,10 @@ describe('BookingPage Coverage', () => {
   });
 
   it('menangani error saat cancel booking (Line 89-91)', async () => {
-    (fetchData as jest.Mock).mockResolvedValue([mockBookings[0]]); // Load 1 data
+    (fetchData as jest.Mock).mockResolvedValue([mockBookings[0]]); 
     render(<BookingPage />);
     await waitFor(() => screen.getByText('User Satu'));
 
-    // Klik Batal -> Konfirmasi Yes -> API Error
     (Swal.fire as jest.Mock).mockResolvedValue({ isConfirmed: true });
     (fetchData as jest.Mock).mockImplementation((url, opt) => {
         if (opt?.method === 'DELETE') return Promise.reject(new Error('Delete Error'));
@@ -135,7 +128,6 @@ describe('BookingPage Coverage', () => {
     render(<BookingPage />);
     await waitFor(() => screen.getByText('User Dua'));
 
-    // Klik Bayar -> API Error
     (fetchData as jest.Mock).mockImplementation((url, opt) => {
         if (opt?.method === 'POST') return Promise.reject(new Error('Pay Error'));
         return Promise.resolve([mockBookings[1]]);
@@ -155,7 +147,6 @@ describe('BookingPage Coverage', () => {
     render(<BookingPage />);
     await waitFor(() => screen.getByText('User Dua'));
 
-    // API Sukses tapi window.open null
     (fetchData as jest.Mock).mockImplementation((url, opt) => {
         if (opt?.method === 'POST') return Promise.resolve({ paymentUrl: 'http://link.com' });
         return Promise.resolve([mockBookings[1]]);
@@ -167,14 +158,12 @@ describe('BookingPage Coverage', () => {
   });
 
   it('menggunakan localStorage untuk menyembunyikan tombol bayar (Line 73)', async () => {
-    // Simulasi localStorage sudah ada data
     localStorageMock.setItem('hasPaymentMap', JSON.stringify({ 'b2': true }));
     (fetchData as jest.Mock).mockResolvedValue([mockBookings[1]]);
     
     render(<BookingPage />);
     await waitFor(() => screen.getByText('User Dua'));
 
-    // Tombol bayar harusnya hilang
     expect(screen.queryByText('Bayar')).not.toBeInTheDocument();
   });
 });

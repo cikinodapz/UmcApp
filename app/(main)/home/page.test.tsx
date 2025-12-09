@@ -1,5 +1,3 @@
-// app/(main)/home/page.test.tsx
-
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import DashboardPage from './page';
@@ -7,7 +5,6 @@ import { fetchData } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { Role } from '@/types';
 
-// --- 1. MOCK DEPENDENCIES ---
 jest.mock('@/lib/api', () => ({
   fetchData: jest.fn(),
 }));
@@ -34,7 +31,6 @@ jest.mock('lucide-react', () => ({
   MessageSquare: () => <span data-testid="icon-msg" />,
 }));
 
-// --- 2. DATA DUMMY ---
 const mockUser = {
   id: 'u1', name: 'John Doe', role: Role.PEMINJAM, email: 'john@example.com'
 };
@@ -73,26 +69,21 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Beranda Peminjam')).toBeInTheDocument();
     expect(screen.getByText(/Halo, John Doe!/i)).toBeInTheDocument();
 
-    // Tunggu data API dimuat
     await waitFor(() => {
-      // PERBAIKAN: Gunakan getAllByText karena angka '5' muncul 2x (Booking & Notifikasi)
       const fives = screen.getAllByText('5');
-      expect(fives.length).toBeGreaterThanOrEqual(2); // Minimal ada 2 elemen dengan teks '5'
+      expect(fives.length).toBeGreaterThanOrEqual(2); 
     });
 
-    // Cek detail spesifik agar lebih aman:
-    // Cari angka di dalam card 'Booking Aktif'
     const bookingCard = screen.getByText('Booking Aktif').closest('div[data-slot="card"]');
-    expect(bookingCard).toHaveTextContent('5'); // 2 + 3 = 5
+    expect(bookingCard).toHaveTextContent('5');
 
-    // Cek angka di dalam card 'Notifikasi Belum Dibaca'
     const notifCard = screen.getByText('Notifikasi Belum Dibaca').closest('div[data-slot="card"]');
     expect(notifCard).toHaveTextContent('5');
 
     // Cek Statistik Lainnya
     expect(screen.getByText('50000')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument(); // Cart
-    expect(screen.getByText('10')).toBeInTheDocument(); // Feedback
+    expect(screen.getByText('2')).toBeInTheDocument(); 
+    expect(screen.getByText('10')).toBeInTheDocument();
   });
 
   it('menampilkan bagian "Jadwal Terdekat" jika data tersedia', async () => {
@@ -133,8 +124,6 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
 
     await waitFor(() => {
-      // Jika error, activeBookingsCount = 0 + 0 = 0
-      // Kita cari angka 0. Karena mungkin muncul banyak, gunakan getAllByText.
       const zeros = screen.getAllByText('0');
       expect(zeros.length).toBeGreaterThan(0);
     });
@@ -143,7 +132,6 @@ describe('DashboardPage', () => {
   });
 
   it('menyesuaikan judul berdasarkan Role User', async () => {
-    // Simulasi bukan peminjam (misal Admin)
     (useAuth as jest.Mock).mockReturnValue({ 
       user: { ...mockUser, role: 'ADMIN' } 
     });
@@ -151,7 +139,6 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    // Tunggu render selesai
     await waitFor(() => {
         expect(screen.getByText('Beranda')).toBeInTheDocument();
     });
