@@ -1,11 +1,8 @@
-// app/(main)/dipinjam/page.test.tsx
-
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import PeminjamanAktifPage from './page';
 import { useToast } from '@/hooks/use-toast';
 
-// --- 1. MOCK LOCALSTORAGE ---
 const localStorageMock = (function () {
   let store: Record<string, string> = {};
   return {
@@ -17,13 +14,11 @@ const localStorageMock = (function () {
 })();
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
-// --- 2. MOCK NEXT & UTILS ---
 jest.mock('next/link', () => ({
   __esModule: true,
   default: ({ children, href }: any) => <a href={href}>{children}</a>
 }));
 
-// Perbaikan Warning 'fill': Destructuring fill prop agar tidak masuk ke img tag
 jest.mock('next/image', () => ({
   __esModule: true,
   default: ({ fill, ...props }: any) => <img {...props} alt={props.alt || 'img'} />
@@ -37,7 +32,6 @@ jest.mock('@/lib/format', () => ({
   formatCurrency: (val: number) => `Rp ${val}`,
 }));
 
-// --- 3. MOCK UI COMPONENTS ---
 jest.mock('@/components/ui/select', () => ({
   Select: ({ value, onValueChange, children }: any) => (
     <select 
@@ -80,7 +74,6 @@ jest.mock('@/components/ui/tabs', () => ({
   ),
 }));
 
-// --- 4. MOCK DATA SOURCE ---
 jest.mock('@/lib/mock', () => {
   const futureDate = new Date(); 
   futureDate.setDate(futureDate.getDate() + 7); 
@@ -126,20 +119,13 @@ describe('PeminjamanAktifPage', () => {
 
     expect(screen.getByText('Sedang Dipinjam')).toBeInTheDocument();
 
-    // PERBAIKAN: Gunakan getAllByText karena "Berjalan" muncul 2x (Badge & Timeline)
-    // Kita cukup pastikan setidaknya satu muncul
     const ongoingStatuses = screen.getAllByText('Berjalan');
     expect(ongoingStatuses.length).toBeGreaterThan(0);
     expect(screen.getByText('Kamera Sony')).toBeInTheDocument();
-
     expect(screen.getByText('Lensa Canon')).toBeInTheDocument();
     const overdueStatuses = screen.getAllByText('Terlambat');
     expect(overdueStatuses.length).toBeGreaterThan(0);
-
     expect(screen.getByText('Jasa Editor')).toBeInTheDocument();
-    // Logic: returnedAt ada -> status RETURNED. Di mock bi3 di-return.
-    // Tapi di mock page.tsx, status derived dari (ret ? 'RETURNED' : ...).
-    // Karena "Dikembalikan" muncul 2x (Badge & Timeline):
     const returnedStatuses = screen.getAllByText('Dikembalikan');
     expect(returnedStatuses.length).toBeGreaterThan(0);
   });
@@ -187,8 +173,7 @@ describe('PeminjamanAktifPage', () => {
   it('dapat memperpanjang durasi peminjaman', async () => {
     render(<PeminjamanAktifPage />);
     const row = screen.getByText('Kamera Sony').closest('.border') as HTMLElement;
-    
-    // Perbaikan query: Gunakan RegExp yang lebih loose jika perlu
+
     const btnExtend = within(row).getByText(/Perpanjang \+1 hari/i);
     fireEvent.click(btnExtend);
 
@@ -204,15 +189,12 @@ describe('PeminjamanAktifPage', () => {
 
     const row = screen.getByText('Kamera Sony').closest('.border') as HTMLElement;
 
-    // PERBAIKAN: Gunakan getAllByText karena "Berjalan" ada 2
-    // Kita ambil badge (biasanya yang pertama) atau cek keberadaan text saja
     expect(within(row).getAllByText('Berjalan').length).toBeGreaterThan(0);
 
     const btnReturn = within(row).getByText('Kembalikan');
     fireEvent.click(btnReturn);
 
     await waitFor(() => {
-        // Setelah return, status jadi "Dikembalikan" (muncul 2x)
         expect(within(row).getAllByText('Dikembalikan').length).toBeGreaterThan(0);
         expect(within(row).queryByText('Kembalikan')).not.toBeInTheDocument();
     });

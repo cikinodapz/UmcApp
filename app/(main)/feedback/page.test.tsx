@@ -1,5 +1,3 @@
-// app/(main)/feedback/page.test.tsx
-
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import FeedbackPage from './page';
@@ -7,7 +5,6 @@ import { fetchData } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { Role } from '@/types';
 
-// --- 1. MOCK DEPENDENCIES ---
 jest.mock('@/lib/api', () => ({ fetchData: jest.fn() }));
 jest.mock('@/contexts/auth-context', () => ({ useAuth: jest.fn() }));
 jest.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: jest.fn() }) }));
@@ -16,9 +13,6 @@ jest.mock('@/lib/format', () => ({
   formatDateTime: (val: string) => val,
 }));
 
-// --- 2. MOCK UI COMPONENTS ---
-
-// Mock DataTable: Render cell apa adanya
 jest.mock('@/components/data-table', () => ({
   DataTable: ({ data, columns }: any) => (
     <div data-testid="mock-table">
@@ -35,8 +29,6 @@ jest.mock('@/components/data-table', () => ({
   ),
 }));
 
-// Mock Select: Render select HTML standar TANPA children invalid
-// Kita filter children untuk hanya mengambil <option> dari SelectItem mock
 jest.mock('@/components/ui/select', () => {
   return {
     Select: ({ value, onValueChange, children }: any) => (
@@ -50,14 +42,13 @@ jest.mock('@/components/ui/select', () => {
         {children}
       </select>
     ),
-    SelectTrigger: ({ children }: any) => null, // Jangan render div trigger di dalam select
+    SelectTrigger: ({ children }: any) => null, 
     SelectContent: ({ children }: any) => <>{children}</>,
     SelectItem: ({ value, children }: any) => <option value={value}>{children}</option>,
     SelectValue: () => null,
   };
 });
 
-// Mock Dialog
 jest.mock('@/components/ui/dialog', () => ({
   Dialog: ({ open, children }: any) => open ? <div data-testid="mock-dialog">{children}</div> : null,
   DialogContent: ({ children }: any) => <div>{children}</div>,
@@ -67,7 +58,6 @@ jest.mock('@/components/ui/dialog', () => ({
   DialogFooter: ({ children }: any) => <div>{children}</div>,
 }));
 
-// --- 3. TEST DATA ---
 const mockFeedbacks = [
   {
     id: 'f1', bookingId: 'b1', userId: 'u1', rating: 5, comment: 'Sangat bagus',
@@ -120,10 +110,7 @@ describe('FeedbackPage', () => {
     });
 
     expect(screen.getByText('Feedback')).toBeInTheDocument();
-    
-    // PERBAIKAN: Cari teks "3" secara spesifik di dalam komponen summary
-    // Kita gunakan fakta bahwa angka "3" muncul di elemen <p class="text-3xl font-bold">
-    // Tapi karena class sulit diquery tanpa testid, kita ambil semua dan pastikan ada.
+
     const threes = screen.getAllByText('3');
     expect(threes.length).toBeGreaterThan(0);
   });
@@ -155,14 +142,8 @@ describe('FeedbackPage', () => {
     await waitFor(() => screen.getByText('Alice'));
 
     const aliceRow = screen.getByText('Alice').closest('[data-testid="table-row"]') as HTMLElement;
-    
-    // PERBAIKAN: Karena ada banyak button (Rating stars + Eye button),
-    // Kita cari button terakhir (biasanya Action ada di kanan) atau cari button yang punya icon SVG Eye.
-    // Tapi karena SVG sulit diquery, kita ambil semua button dalam row.
-    // Tombol rating = 5, Tombol eye = 1. Total 6 button. Tombol Eye biasanya terakhir di DOM order.
-    
     const buttons = within(aliceRow).getAllByRole('button');
-    const viewButton = buttons[buttons.length - 1]; // Asumsi tombol aksi ada di kolom terakhir
+    const viewButton = buttons[buttons.length - 1]; 
     
     fireEvent.click(viewButton);
 

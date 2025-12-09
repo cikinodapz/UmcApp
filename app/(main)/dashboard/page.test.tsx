@@ -1,5 +1,3 @@
-// app/(main)/dashboard/page.test.tsx
-
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import DashboardPage from './page';
@@ -7,7 +5,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { fetchData } from '@/lib/api';
 import { Role } from '@/types';
 
-// --- MOCKS ---
 jest.mock('@/contexts/auth-context', () => ({ useAuth: jest.fn() }));
 jest.mock('@/lib/api', () => ({ fetchData: jest.fn() }));
 
@@ -18,7 +15,6 @@ jest.mock('next/image', () => ({
   __esModule: true, default: ({ fill, ...props }: any) => <img {...props} />
 }));
 
-// Mock Chart
 jest.mock('@/components/mini-line-chart', () => ({
   MiniLineChart: ({ title, subtitle, data }: any) => (
     <div data-testid="mini-chart">
@@ -29,7 +25,6 @@ jest.mock('@/components/mini-line-chart', () => ({
   ),
 }));
 
-// Mock DataTable
 jest.mock('@/components/data-table', () => ({
   DataTable: ({ title, data, columns }: any) => (
     <div data-testid="data-table">
@@ -92,9 +87,7 @@ describe('DashboardPage Coverage', () => {
         const hyphens = screen.getAllByText('-');
         expect(hyphens.length).toBeGreaterThan(0);
       });
-
-      // PERBAIKAN DI SINI:
-      // Gunakan getAllByText karena ada 2 chart yang menampilkan tanggal ini
+      
       const invalidDates = screen.getAllByText('invalid-date');
       expect(invalidDates.length).toBeGreaterThan(0);
     });

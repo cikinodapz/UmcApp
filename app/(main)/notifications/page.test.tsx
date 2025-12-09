@@ -1,5 +1,3 @@
-// app/(main)/notifications/page.test.tsx
-
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import NotificationsPage from './page';
@@ -7,8 +5,6 @@ import { fetchData } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { NotificationType } from '@/types';
 import Swal from 'sweetalert2';
-
-// --- 1. MOCK DEPENDENCIES ---
 
 jest.mock('@/lib/api', () => ({
   fetchData: jest.fn(),
@@ -43,8 +39,6 @@ jest.mock('lucide-react', () => ({
   ChevronsRight: () => <span>&gt;&gt;</span>,
 }));
 
-// --- 2. MOCK UI COMPONENTS ---
-
 jest.mock('@/components/ui/select', () => ({
   Select: ({ value, onValueChange, children }: any) => (
     <select
@@ -60,8 +54,6 @@ jest.mock('@/components/ui/select', () => ({
   SelectContent: ({ children }: any) => <>{children}</>,
   SelectItem: ({ value, children }: any) => <option value={value}>{children}</option>,
 }));
-
-// --- 3. DUMMY DATA ---
 
 const mockNotifications = [
   {
@@ -101,8 +93,7 @@ describe('NotificationsPage', () => {
   it('merender daftar notifikasi dan menghitung unread count', async () => {
     render(<NotificationsPage />);
 
-    // PERBAIKAN: Tunggu Loading selesai dulu
-    // Kita tunggu teks "Notifikasi" muncul
+    // tunggu teks "Notifikasi" muncul
     await waitFor(() => {
         expect(screen.getByText('Notifikasi')).toBeInTheDocument();
     });

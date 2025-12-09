@@ -1,13 +1,9 @@
-// app/(main)/denda/page.test.tsx
-
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import FinesPage from './page';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Role } from '@/types';
-
-// --- 1. MOCK DATA & LIBRARIES ---
 
 // Mock Auth
 jest.mock('@/contexts/auth-context', () => ({
@@ -25,7 +21,6 @@ jest.mock('@/lib/format', () => ({
   formatDateTime: (val: string) => val,
 }));
 
-// --- 2. MOCK DATA SOURCE (@/lib/mock) ---
 jest.mock('@/lib/mock', () => ({
   mockUsers: [
     { id: 'u1', name: 'User Satu', email: 'u1@test.com' },
@@ -45,9 +40,6 @@ jest.mock('@/lib/mock', () => ({
   ]
 }));
 
-// --- 3. MOCK UI COMPONENTS ---
-
-// Mock DataTable: Render secara selektif agar tidak duplikat
 jest.mock('@/components/data-table', () => ({
   DataTable: ({ data, columns }: any) => (
     <div data-testid="mock-table">
@@ -68,7 +60,6 @@ jest.mock('@/components/data-table', () => ({
   ),
 }));
 
-// Mock Select (PERBAIKAN: Jangan render div children di dalam select)
 jest.mock('@/components/ui/select', () => ({
   Select: ({ value, onValueChange, children }: any) => (
     <select 
@@ -81,7 +72,7 @@ jest.mock('@/components/ui/select', () => ({
       {children}
     </select>
   ),
-  SelectTrigger: () => null, // JANGAN RENDER TRIGGER (DIV) DI SINI
+  SelectTrigger: () => null, 
   SelectValue: () => null,
   SelectContent: ({ children }: any) => <>{children}</>,
   SelectItem: ({ value, children }: any) => <option value={value}>{children}</option>,
@@ -123,23 +114,15 @@ describe('FinesPage', () => {
       render(<FinesPage />);
 
       expect(screen.getByText('Denda')).toBeInTheDocument();
-      
-      // Cek Summary Cards
       expect(screen.getByText('Rp 70000')).toBeInTheDocument(); 
       expect(screen.getByText('Rp 10000')).toBeInTheDocument();
-      
-      // Total rows = 3 (f1, f2, f3)
-      // Karena teks "3" bisa muncul di summary card ATAU di pagination mock, 
-      // kita cek keberadaan spesifik di card summary.
-      // Cara aman: cek jumlah row di tabel.
+
       const rows = screen.getAllByTestId('table-row');
       expect(rows.length).toBe(3);
 
-      // Cek User Satu ada (f1, f3) - gunakan getAllByText karena muncul 2x
       const userSatuRows = screen.getAllByText('User Satu');
       expect(userSatuRows.length).toBeGreaterThan(0);
 
-      // Cek User Dua ada (f2)
       expect(screen.getByText('User Dua')).toBeInTheDocument();
     });
 
@@ -166,8 +149,6 @@ describe('FinesPage', () => {
     it('membuka dialog konfirmasi dan menandai denda lunas', async () => {
       render(<FinesPage />);
 
-      // Cari tombol bayar. Tombol ini ada di dalam row UNPAID.
-      // Kita ambil semua tombol "Tandai Lunas".
       const payButtons = screen.getAllByText('Tandai Lunas');
       const targetButton = payButtons[0]; 
 
@@ -177,9 +158,6 @@ describe('FinesPage', () => {
       expect(screen.getByText('Konfirmasi Pembayaran Denda')).toBeInTheDocument();
       expect(screen.getByText('Telat 1 hari')).toBeInTheDocument(); 
 
-      // Klik Konfirmasi di dalam dialog. 
-      // Karena tombol pemicu dan tombol konfirmasi punya teks sama "Tandai Lunas",
-      // kita harus scope pencarian ke dalam dialog.
       const dialog = screen.getByTestId('mock-dialog');
       const confirmButton = within(dialog).getByText('Tandai Lunas');
       
@@ -195,7 +173,6 @@ describe('FinesPage', () => {
     });
   });
 
-  // --- SKENARIO 2: USER VIEW ---
   describe('Regular User View', () => {
     beforeEach(() => {
       (useAuth as jest.Mock).mockReturnValue({
@@ -208,13 +185,11 @@ describe('FinesPage', () => {
 
       expect(screen.getByText('Lihat status denda Anda')).toBeInTheDocument();
 
-      // Cek Tabel: User Dua (f2) TIDAK BOLEH MUNCUL
       expect(screen.queryByText('User Dua')).not.toBeInTheDocument();
       
       const rows = screen.getAllByTestId('table-row');
-      expect(rows.length).toBe(2); // f1 dan f3 milik User Satu
+      expect(rows.length).toBe(2); 
 
-      // Cek Summary Card
       expect(screen.getByText('Rp 50000')).toBeInTheDocument(); 
       expect(screen.queryByText('Rp 70000')).not.toBeInTheDocument();
     });
