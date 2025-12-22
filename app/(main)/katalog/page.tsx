@@ -185,7 +185,7 @@ export default function ServicesPage() {
             src={src}
             alt="Layanan Multimedia UMC"
             fill
-            priority={idx === heroIndex}
+              priority={idx === heroIndex}
             className={`object-cover transition-opacity duration-700 ease-out ${idx === heroIndex ? "opacity-100" : "opacity-0"}`}
             aria-hidden={idx !== heroIndex}
           />

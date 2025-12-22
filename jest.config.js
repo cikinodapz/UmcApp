@@ -10,9 +10,9 @@ const customJestConfig = {
   
   // --- TAMBAHKAN BAGIAN INI ---
   moduleNameMapper: {
-    // Memberitahu Jest bahwa @/ merujuk ke folder root
-    '^@/(.*)$': '<rootDir>/$1',
-  }
+  "^@/(.*)$": "<rootDir>/$1",
+}
+  
 }
 
 module.exports = createJestConfig(customJestConfig)
