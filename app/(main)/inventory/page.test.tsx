@@ -1,4 +1,3 @@
-// app/(main)/inventory/page.test.tsx
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
@@ -7,7 +6,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Role } from '@/types';
 
-// --- 1. MOCK DEPENDENCIES ---
 
 jest.mock('@/contexts/auth-context', () => ({
   useAuth: jest.fn(),
@@ -21,15 +19,12 @@ jest.mock('@/lib/format', () => ({
   formatCurrency: (val: number) => `Rp ${val}`,
 }));
 
-// Mock Next Image
+
 jest.mock('next/image', () => ({
   __esModule: true,
   default: ({ fill, ...props }: any) => <img {...props} alt={props.alt || 'img'} />,
 }));
 
-// Mock Child Components (Forms)
-// Kita mock form dialog agar test fokus pada interaksi page level (buka/tutup/save), 
-// bukan detail validasi form (yang harusnya ada di unit test form component sendiri).
 jest.mock('@/components/asset-form-dialog', () => ({
   AssetFormDialog: ({ open, onSave, onOpenChange }: any) => 
     open ? (
@@ -52,7 +47,6 @@ jest.mock('@/components/service-form-dialog', () => ({
     ) : null,
 }));
 
-// Mock DataTable (Render Simple List)
 jest.mock('@/components/data-table', () => ({
   DataTable: ({ data, columns }: any) => (
     <div data-testid="mock-table">
@@ -70,7 +64,6 @@ jest.mock('@/components/data-table', () => ({
   ),
 }));
 
-// Mock UI Components
 jest.mock('@/components/ui/select', () => ({
   Select: ({ value, onValueChange, children }: any) => (
     <select data-testid="mock-select" value={value} onChange={e => onValueChange(e.target.value)}>
@@ -87,8 +80,6 @@ jest.mock('@/components/ui/tabs', () => ({
   Tabs: ({ defaultValue, children }: any) => <div>{children}</div>,
   TabsList: ({ children }: any) => <div>{children}</div>,
   TabsTrigger: ({ value, children }: any) => <button data-testid={`tab-${value}`}>{children}</button>,
-  // Mock TabsContent: Tampilkan KEDUANYA agar mudah di-query (atau mock state internal tabs jika perlu ketat)
-  // Di sini kita render konten dengan test-id pembeda
   TabsContent: ({ value, children }: any) => <div data-testid={`content-${value}`}>{children}</div>,
 }));
 
@@ -187,26 +178,10 @@ describe('InventoryPage', () => {
     // Dialog Muncul (Mocked)
     expect(screen.getByTestId('asset-dialog')).toBeInTheDocument();
 
-    // Simpan
+
     fireEvent.click(screen.getByText('Simpan Aset'));
 
-    // Console log check (mock implementation)
-    // Di real code mungkin refresh data/toast. Di sini code hanya log.
-    // Kita bisa cek apakah dialog tertutup (setAssetDialogOpen(false))
-    // Namun mock AssetFormDialog kita render berdasar props 'open'.
-    // Karena logic onSave di page.tsx memanggil setAssetDialogOpen(false),
-    // dialog harusnya hilang jika onSave dipanggil.
-    // Tapi tunggu, di kode asli `handleSaveAsset` hanya console.log dan setEditingAsset(undefined).
-    // TIDAK ADA `setAssetDialogOpen(false)` di dalam `handleSaveAsset`.
-    // Dialog ditutup oleh logic internal AssetFormDialog (yang kita mock).
-    // Jadi di mock, tombol simpan harus memanggil onSave.
-    
-    // Koreksi: Code asli component `InventoryPage`:
-    // const handleSaveAsset = (data) => { console.log...; setEditingAsset(undefined); }
-    // Tidak menutup dialog secara eksplisit di fungsi handleSaveAsset? 
-    // Oh, biasanya FormDialog yang handle close setelah success.
-    // Tapi di kode `page.tsx` yang Anda berikan, `AssetFormDialog` menerima `onOpenChange`.
-    // Jadi flow tutup dialog ada di dalam `AssetFormDialog`.
+
   });
 
   it('Admin dapat menghapus aset', async () => {

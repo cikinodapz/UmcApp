@@ -12,7 +12,8 @@ jest.mock("@/lib/api", () => ({ fetchData: jest.fn() }));
 // next/image -> <img>
 jest.mock("next/image", () => (props: any) => {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img alt={props.alt || "img"} {...props} />;
+  const { src, alt, priority, fill, ...rest } = props;
+  return <img src={src} alt={alt || "img"} {...rest} />;
 });
 
 // router

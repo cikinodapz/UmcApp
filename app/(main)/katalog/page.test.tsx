@@ -22,7 +22,7 @@ jest.mock("@/lib/api", () => ({
 jest.mock("next/image", () => ({
   __esModule: true,
   default: (props: any) => {
-    const { src, alt, ...rest } = props;
+    const { src, alt, priority, fill, ...rest } = props;
     const resolved = typeof src === "string" ? src : src?.src ?? "";
     return <img src={resolved} alt={alt} {...rest} />;
   },
@@ -113,7 +113,9 @@ describe("Katalog Page", () => {
   });
 
   afterEach(() => {
-    jest.runOnlyPendingTimers();
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
     jest.clearAllTimers();
     jest.useRealTimers();
   });
