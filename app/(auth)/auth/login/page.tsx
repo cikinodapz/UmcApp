@@ -28,19 +28,70 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoaded, setGoogleLoaded] = useState(false)
+  const [googleError, setGoogleError] = useState(false)
+  const [googleRetryCount, setGoogleRetryCount] = useState(0)
   const router = useRouter()
 
-  useEffect(() => {
+  // Load Google SDK with error handling and retry
+  const loadGoogleScript = useCallback(() => {
+    // Check if already loaded
+    if (window.google?.accounts?.id) {
+      setGoogleLoaded(true)
+      setGoogleError(false)
+      return
+    }
+
+    // Remove existing script if any
+    const existingScript = document.querySelector('script[src*="accounts.google.com/gsi/client"]')
+    if (existingScript) {
+      existingScript.remove()
+    }
+
+    setGoogleError(false)
     const script = document.createElement("script")
     script.src = "https://accounts.google.com/gsi/client"
     script.async = true
     script.defer = true
-    script.onload = () => setGoogleLoaded(true)
-    document.body.appendChild(script)
-    return () => {
-      document.body.removeChild(script)
+
+    // Timeout fallback - if script doesn't load in 10 seconds, show error
+    const timeout = setTimeout(() => {
+      if (!window.google?.accounts?.id) {
+        setGoogleError(true)
+        setGoogleLoaded(false)
+      }
+    }, 10000)
+
+    script.onload = () => {
+      clearTimeout(timeout)
+      // Double check if google is actually available
+      if (window.google?.accounts?.id) {
+        setGoogleLoaded(true)
+        setGoogleError(false)
+      } else {
+        // Sometimes script loads but google object not ready, wait a bit
+        setTimeout(() => {
+          if (window.google?.accounts?.id) {
+            setGoogleLoaded(true)
+            setGoogleError(false)
+          } else {
+            setGoogleError(true)
+          }
+        }, 500)
+      }
     }
+
+    script.onerror = () => {
+      clearTimeout(timeout)
+      setGoogleError(true)
+      setGoogleLoaded(false)
+    }
+
+    document.body.appendChild(script)
   }, [])
+
+  useEffect(() => {
+    loadGoogleScript()
+  }, [loadGoogleScript, googleRetryCount])
 
   const handleGoogleResponse = useCallback(async (response: any) => {
     if (!response?.credential) {
@@ -263,7 +314,7 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin !text-white" />
-                <span className="!text-white">Masuk...</span>
+                  <span className="!text-white">Masuk...</span>
                 </>
               ) : (
                 <span className="!text-white font-medium">Masuk</span>
@@ -281,38 +332,68 @@ export default function LoginPage() {
           </div>
 
           {/* TOMBOL GOOGLE KUSTOM: bentuk mirip, warna tetap putih */}
-          <Button
-            type="button"
-            onClick={handleCustomGoogleClick}
-            disabled={!googleLoaded || isLoading}
-            aria-label="Masuk dengan Google"
-            className="w-full h-12 rounded-xl bg-white text-gray-900 border-2 border-gray-200 hover:bg-gray-50 font-medium shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Masuk dengan Google...</span>
-              </>
-            ) : (
-              <>
-                {/* Ikon Google full-color agar kontras di background putih */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 48 48"
-                  className="shrink-0"
-                  aria-hidden="true"
-                >
-                  <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.602 32.167 29.223 35 24 35c-7.18 0-13-5.82-13-13s5.82-13 13-13c3.313 0 6.315 1.234 8.594 3.252l5.657-5.657C34.754 3.053 29.648 1 24 1 11.85 1 2 10.85 2 23s9.85 22 22 22c12.15 0 22-9.85 22-22 0-1.474-.153-2.911-.389-4.417z"/>
-                  <path fill="#FF3D00" d="M6.306 14.691l6.571 4.814C14.48 16.146 18.861 13 24 13c3.313 0 6.315 1.234 8.594 3.252l5.657-5.657C34.754 3.053 29.648 1 24 1 15.317 1 7.83 6.13 4.306 13.309z"/>
-                  <path fill="#4CAF50" d="M24 45c5.136 0 9.718-1.97 13.211-5.178l-6.1-5.159C29.87 36.927 27.085 38 24 38c-5.198 0-9.556-3.315-11.146-7.946l-6.54 5.036C9.797 41.826 16.38 45 24 45z"/>
-                  <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303C34.623 31.324 29.223 35 24 35c-5.198 0-9.556-3.315-11.146-7.946l-6.54 5.036C9.797 41.826 16.38 45 24 45c12.15 0 22-9.85 22-22 0-1.474-.153-2.911-.389-4.417z"/>
-                </svg>
-                <span className="font-medium">Masuk dengan Google</span>
-              </>
-            )}
-          </Button>
+          {googleError ? (
+            // Error state - show retry button
+            <Button
+              type="button"
+              onClick={() => setGoogleRetryCount((c) => c + 1)}
+              aria-label="Coba lagi Google Login"
+              className="w-full h-12 rounded-xl bg-red-50 text-red-700 border-2 border-red-200 hover:bg-red-100 font-medium shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 21h5v-5" />
+              </svg>
+              <span className="font-medium">Google gagal dimuat - Coba lagi</span>
+            </Button>
+          ) : !googleLoaded ? (
+            // Loading state
+            <Button
+              type="button"
+              disabled
+              aria-label="Memuat Google Login"
+              className="w-full h-12 rounded-xl bg-gray-50 text-gray-500 border-2 border-gray-200 font-medium shadow-sm flex items-center justify-center gap-2 cursor-not-allowed"
+            >
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Memuat Google...</span>
+            </Button>
+          ) : (
+            // Normal state - Google loaded
+            <Button
+              type="button"
+              onClick={handleCustomGoogleClick}
+              disabled={isLoading}
+              aria-label="Masuk dengan Google"
+              className="w-full h-12 rounded-xl bg-white text-gray-900 border-2 border-gray-200 hover:bg-gray-50 font-medium shadow-sm hover:shadow transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Masuk dengan Google...</span>
+                </>
+              ) : (
+                <>
+                  {/* Ikon Google full-color agar kontras di background putih */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 48 48"
+                    className="shrink-0"
+                    aria-hidden="true"
+                  >
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.602 32.167 29.223 35 24 35c-7.18 0-13-5.82-13-13s5.82-13 13-13c3.313 0 6.315 1.234 8.594 3.252l5.657-5.657C34.754 3.053 29.648 1 24 1 11.85 1 2 10.85 2 23s9.85 22 22 22c12.15 0 22-9.85 22-22 0-1.474-.153-2.911-.389-4.417z" />
+                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.814C14.48 16.146 18.861 13 24 13c3.313 0 6.315 1.234 8.594 3.252l5.657-5.657C34.754 3.053 29.648 1 24 1 15.317 1 7.83 6.13 4.306 13.309z" />
+                    <path fill="#4CAF50" d="M24 45c5.136 0 9.718-1.97 13.211-5.178l-6.1-5.159C29.87 36.927 27.085 38 24 38c-5.198 0-9.556-3.315-11.146-7.946l-6.54 5.036C9.797 41.826 16.38 45 24 45z" />
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303C34.623 31.324 29.223 35 24 35c-5.198 0-9.556-3.315-11.146-7.946l-6.54 5.036C9.797 41.826 16.38 45 24 45c12.15 0 22-9.85 22-22 0-1.474-.153-2.911-.389-4.417z" />
+                  </svg>
+                  <span className="font-medium">Masuk dengan Google</span>
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Tombol resmi Google (fallback) – disembunyikan */}
           <div id="google-signin-button" className="w-full sr-only" />
