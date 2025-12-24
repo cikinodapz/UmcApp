@@ -1,100 +1,87 @@
-import { render, screen, fireEvent } from "@testing-library/react"
-import "@testing-library/jest-dom"
-import CategoriesPage from "./page"
-import { Role } from "@/types"
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import BookingsPage from "./page";
 
-const useAuthMock = jest.fn()
 jest.mock("@/contexts/auth-context", () => ({
-  useAuth: () => useAuthMock(),
-}))
-
-const toastMock = jest.fn()
-jest.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({
-    toast: toastMock,
+  useAuth: () => ({
+    user: {
+      id: "u1",
+      name: "Admin",
+      role: "ADMIN",
+    },
   }),
-}))
+}));
 
-jest.mock("@/components/data-table", () => ({
-  DataTable: ({ data }: any) => (
-    <div data-testid="data-table">Total kategori: {data.length}</div>
-  ),
-}))
+jest.mock("@/lib/api", () => ({
+  fetchData: jest.fn(),
+}));
 
-jest.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children }: any) => <div>{children}</div>,
-  DialogTrigger: ({ children }: any) => <div>{children}</div>,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
-}))
+jest.mock("sweetalert2", () => ({
+  fire: jest.fn(),
+}));
 
-describe("CategoriesPage", () => {
+import { fetchData } from "@/lib/api";
+
+describe("BookingsPage", () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
-  it("menolak akses jika user bukan admin", () => {
-    useAuthMock.mockReturnValue({
-      user: { role: Role.PEMINJAM },
-    })
+  it("menampilkan halaman booking", async () => {
+    (fetchData as jest.Mock).mockResolvedValueOnce([]);
 
-    render(<CategoriesPage />)
+    render(<BookingsPage />);
 
     expect(
-      screen.getByText("Akses ditolak. Halaman ini hanya untuk admin.")
-    ).toBeInTheDocument()
-  })
+      await screen.findByText("Kelola Booking")
+    ).toBeInTheDocument();
+  });
 
-  it("render halaman kelola kategori untuk admin", () => {
-    useAuthMock.mockReturnValue({
-      user: { role: Role.ADMIN },
-    })
+  it("menampilkan data booking (row tabel muncul)", async () => {
+    (fetchData as jest.Mock).mockResolvedValueOnce([
+      {
+        id: "booking-9999",
+        status: "PENDING",
+        startDate: new Date().toISOString(),
+      },
+    ]);
 
-    render(<CategoriesPage />)
+    render(<BookingsPage />);
 
-    expect(screen.getByText("Kelola Kategori")).toBeInTheDocument()
-  })
+    await waitFor(() => {
+      const rows = screen.getAllByRole("row");
+      // 1 header + 1 data
+      expect(rows.length).toBeGreaterThan(1);
+    });
+  });
 
-  it("menampilkan tabel kategori", () => {
-    useAuthMock.mockReturnValue({
-      user: { role: Role.ADMIN },
-    })
+  it("membuka dialog detail saat tombol detail diklik", async () => {
+    (fetchData as jest.Mock)
+      .mockResolvedValueOnce([
+        {
+          id: "booking-9999",
+          status: "PENDING",
+          startDate: new Date().toISOString(),
+        },
+      ])
+      .mockResolvedValueOnce({
+        id: "booking-9999",
+        status: "PENDING",
+        totalAmount: 100000,
+      });
 
-    render(<CategoriesPage />)
+    render(<BookingsPage />);
 
-    expect(screen.getByTestId("data-table")).toBeInTheDocument()
-  })
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      expect(buttons.length).toBeGreaterThan(0);
+    });
 
-  it("menampilkan form tambah kategori", () => {
-    useAuthMock.mockReturnValue({
-      user: { role: Role.ADMIN },
-    })
+    const buttons = screen.getAllByRole("button");
+    fireEvent.click(buttons[0]);
 
-    render(<CategoriesPage />)
-
-    expect(screen.getByLabelText("Nama Kategori")).toBeInTheDocument()
-    expect(screen.getByLabelText("Deskripsi")).toBeInTheDocument()
-  })
-
-  it("submit tambah kategori menampilkan toast sukses", () => {
-    useAuthMock.mockReturnValue({
-      user: { role: Role.ADMIN },
-    })
-
-    render(<CategoriesPage />)
-
-    fireEvent.change(screen.getByLabelText("Nama Kategori"), {
-      target: { value: "Kategori Baru" },
-    })
-
-    // klik tombol submit (index ke-1)
-    fireEvent.click(screen.getAllByText("Tambah Kategori")[1])
-
-    expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Berhasil",
-      })
-    )
-  })
-})
+    await waitFor(() =>
+      expect(screen.getByText("Detail Booking")).toBeInTheDocument()
+    );
+  });
+});
