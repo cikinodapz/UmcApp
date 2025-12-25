@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Pencil, Trash2 } from "lucide-react"
-import { categories } from "@/lib/mock"
-import type { Category } from "@/types"
+import { mockCategories as categories } from "@/lib/mock"
+import { Role, type Category } from "@/types"
 
 export default function CategoriesPage() {
   const { user } = useAuth()
@@ -24,7 +24,7 @@ export default function CategoriesPage() {
   })
 
   // Only admin can access this page
-  if (user?.role !== "admin") {
+  if (user?.role !== Role.ADMIN) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-gray-500">Akses ditolak. Halaman ini hanya untuk admin.</p>
@@ -56,7 +56,7 @@ export default function CategoriesPage() {
     setEditingCategory(category)
     setFormData({
       name: category.name,
-      description: category.description,
+      description: category.description || "",
     })
     setIsDialogOpen(true)
   }
@@ -73,25 +73,25 @@ export default function CategoriesPage() {
 
   const columns = [
     {
-      accessorKey: "name",
-      header: "Nama Kategori",
+      key: "name",
+      title: "Nama Kategori",
     },
     {
-      accessorKey: "description",
-      header: "Deskripsi",
+      key: "description",
+      title: "Deskripsi",
     },
     {
-      id: "actions",
-      header: "Aksi",
-      cell: ({ row }: { row: { original: Category } }) => (
+      key: "actions",
+      title: "Aksi",
+      render: (_: any, category: Category) => (
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => handleEdit(row.original)} className="rounded-xl">
+          <Button variant="outline" size="sm" onClick={() => handleEdit(category)} className="rounded-xl">
             <Pencil className="h-4 w-4" />
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleDelete(row.original)}
+            onClick={() => handleDelete(category)}
             className="rounded-xl text-red-600 hover:text-red-700"
           >
             <Trash2 className="h-4 w-4" />
@@ -148,7 +148,7 @@ export default function CategoriesPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-        <DataTable columns={columns} data={categories} searchKey="name" searchPlaceholder="Cari kategori..." />
+        <DataTable columns={columns} data={categories} searchPlaceholder="Cari kategori..." />
       </div>
     </div>
   )

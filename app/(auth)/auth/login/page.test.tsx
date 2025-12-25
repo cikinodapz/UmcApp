@@ -245,7 +245,8 @@ describe("LoginPage", () => {
   // NEW TEST: Google button click when google is not loaded
   it("Google button disabled ketika belum loaded", () => {
     const { container } = render(<LoginPage />);
-    const googleBtn = container.querySelector("button[aria-label='Masuk dengan Google']");
+    // When Google is not loaded, the loading button is shown with aria-label="Memuat Google Login"
+    const googleBtn = container.querySelector("button[aria-label='Memuat Google Login']");
     expect(googleBtn).toBeDisabled();
   });
 

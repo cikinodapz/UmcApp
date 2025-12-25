@@ -32,8 +32,9 @@ describe("BookingsPage", () => {
 
     render(<BookingsPage />);
 
+    // Page shows "Kelola Pemesanan" for admin, not "Kelola Booking"
     expect(
-      await screen.findByText("Kelola Booking")
+      await screen.findByText("Kelola Pemesanan")
     ).toBeInTheDocument();
   });
 
@@ -41,12 +42,20 @@ describe("BookingsPage", () => {
     (fetchData as jest.Mock).mockResolvedValueOnce([
       {
         id: "booking-9999",
-        status: "PENDING",
+        status: "MENUNGGU",
         startDate: new Date().toISOString(),
+        endDate: new Date().toISOString(),
+        items: [],
+        totalAmount: 100000,
       },
     ]);
 
     render(<BookingsPage />);
+
+    // Wait for loading to complete and table to render
+    await waitFor(() => {
+      expect(screen.getByText("Kelola Pemesanan")).toBeInTheDocument();
+    });
 
     await waitFor(() => {
       const rows = screen.getAllByRole("row");
@@ -60,25 +69,41 @@ describe("BookingsPage", () => {
       .mockResolvedValueOnce([
         {
           id: "booking-9999",
-          status: "PENDING",
+          status: "MENUNGGU",
           startDate: new Date().toISOString(),
+          endDate: new Date().toISOString(),
+          items: [],
+          totalAmount: 100000,
         },
       ])
       .mockResolvedValueOnce({
         id: "booking-9999",
-        status: "PENDING",
+        status: "MENUNGGU",
         totalAmount: 100000,
+        items: [],
       });
 
     render(<BookingsPage />);
 
+    // Wait for loading to finish
+    await waitFor(() => {
+      expect(screen.getByText("Kelola Pemesanan")).toBeInTheDocument();
+    });
+
+    // Wait for buttons to appear
     await waitFor(() => {
       const buttons = screen.getAllByRole("button");
       expect(buttons.length).toBeGreaterThan(0);
     });
 
     const buttons = screen.getAllByRole("button");
-    fireEvent.click(buttons[0]);
+    // Find the Eye button for detail view (first action button in the actions column area)
+    const eyeButton = buttons.find(btn => btn.closest('.flex.items-center.gap-2'));
+    if (eyeButton) {
+      fireEvent.click(eyeButton);
+    } else {
+      fireEvent.click(buttons[0]);
+    }
 
     await waitFor(() =>
       expect(screen.getByText("Detail Booking")).toBeInTheDocument()
